@@ -41,6 +41,7 @@ from pitivi.settings import GlobalSettings
 from pitivi.utils import beautify_length
 from pitivi.ui.common import beautify_factory, factory_name, \
     beautify_stream, PADDING
+from pitivi.ui.youtubedownloader import Downloader
 from pitivi.log.loggable import Loggable
 from pitivi.sourcelist import SourceListError
 
@@ -79,6 +80,7 @@ ui = '''
             <placeholder name="SourceList" >
                 <menuitem action="ImportSources" />
                 <menuitem action="ImportSourcesFolder" />
+                <menuitem action="ImportFromYouTube" />
                 <menuitem action="RemoveSources" />
                 <separator />
                 <menuitem action="InsertEnd" />
@@ -269,6 +271,8 @@ class SourceList(gtk.VBox, Loggable):
             ("ImportSourcesFolder", gtk.STOCK_ADD,
                 _("Import _folder of clips..."), None,
                 _("Import folder of clips to use"), self._importSourcesFolderCb),
+            ("ImportFromYouTube", gtk.STOCK_ADD, _("_Import from YouTube..."),
+                None, _("Import clips from YouTube"), self._importFromYouTubeCb),
         )
 
         # only available when selection is non-empty 
@@ -332,6 +336,9 @@ class SourceList(gtk.VBox, Loggable):
 
     def _importSourcesCb(self, unused_action):
         self.showImportSourcesDialog()
+
+    def _importFromYouTubeCb(self, unused_action):
+        self.showImportFromYouTubeDialog()
 
     def _importSourcesFolderCb(self, unused_action):
         self.showImportSourcesDialog(True)
@@ -432,6 +439,9 @@ class SourceList(gtk.VBox, Loggable):
         self.infobar.hide_all()
         self.txtlabel.show()
         self.infobar.show()
+
+    def showImportFromYouTubeDialog(self):
+        a = Downloader(self.app)
 
     def showImportSourcesDialog(self, select_folders=False):
         """Pop up the "Import Sources" dialog box"""
