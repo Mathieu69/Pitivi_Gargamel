@@ -117,6 +117,7 @@ class SourceList(gtk.VBox, Loggable):
 
         self.app = instance
         self.settings = instance.settings
+        self.downloading = 0
 
         # Store
         # icon, infotext, objectfactory, uri, length
@@ -446,7 +447,11 @@ class SourceList(gtk.VBox, Loggable):
         self.infobar.show()
 
     def showImportFromYouTubeDialog(self):
-        a = Downloader(self.app)
+        if self.downloading < 3:
+            a = Downloader(self.app)
+            self.downloading += 1
+        else :
+            pass
 
     def showImportSourcesDialog(self, select_folders=False):
         """Pop up the "Import Sources" dialog box"""

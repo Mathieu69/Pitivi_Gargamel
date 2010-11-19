@@ -1,17 +1,6 @@
-from urllib import urlretrieve, urlcleanup
-from urllib2 import Request, urlopen, URLError
-from httplib import HTTPException
-from socket import error
-import gio, gtk, os, gobject
-import gdata.youtube
-import gdata.youtube.service
-from thread import start_new_thread
-from urlparse import urlparse
-import time
+import gtk, os, time
 from pitivi.utils import beautify_length
-import gst
-import cgi
-from tempfile import TemporaryFile
+from gst import SECOND
 from pitivi.youtubedownloader import Downloader2, GDataQuerier
 
 from pitivi.sourcelist import SourceListError
@@ -21,11 +10,6 @@ from pitivi.configure import get_pixmap_dir
 (COL_SHORT_TEXT,
  COL_ICON,
  COL_TOOLTIP) = range(3)
-
-try:
-	from urlparse import parse_qs
-except ImportError:
-	from cgi import parse_qs
 
 from pitivi.configure import LIBDIR
 
@@ -40,8 +24,6 @@ class Downloader:
     def __init__(self, instance):
         self.app = instance
         self._createUi()
-        self.yt_service = gdata.youtube.service.YouTubeService()
-        self.yt_service.ssl = False
         self.downloading = 0
         self._packed = 0
         self.toggled = 1
@@ -56,6 +38,7 @@ class Downloader:
         self.dictio["vbox1"].remove(self.dictio['hbuttonbox2'])
         self.dictio["label1"].set_text("Choose a folder to save the clip in")
         self.dictio["vbox1"].remove(self.dictio["scrolledwindow1"])
+
         if not self.downloading :
             if self.app.current.uri and self.toggled:
                 dest = self.app.current.uri
@@ -63,13 +46,16 @@ class Downloader:
                 dest = dest[0][7:]
                 dest = (dest + "/" + self.video_title)
                 "".join(dest)
+                self.uri = dest.rsplit("/", 1)[0]
                 self.downloader = Downloader2(self.template, dest)
+                self.downloader.connect("finished", self._downloadFileCompleteCb)
                 self.downloader.connect("progress", self._progressCb)
                 self._createProgressBar()
                 self.downloading = 1
             else :
                 self.builder.get_object("vbox2").remove(self.builder.get_object("vbox1"))
                 self._createFileChooser()
+
     def _createUi(self) :
         if 'pitivi.exe' in __file__.lower():
             glade_dir = LIBDIR
@@ -82,70 +68,67 @@ class Downloader:
         self.builder.connect_signals(self)
 
         self.dictio = {}
-        for e in ["vbox1", "vbox2", "hbuttonbox1", "hbuttonbox2", "entry1", "label1", "scrolledwindow1"]:
+        for e in ["vbox1", "vbox2", "hbuttonbox1", "hbuttonbox2", "entry1",
+         "label1", "scrolledwindow1","window1", "button1", "button2"]:
             self.dictio[e] = self.builder.get_object(e)
         self.dictio["entry1"].connect('button-press-event', self._deleteTextCb)
-        
-        combo = gtk.combo_box_new_text()
-        self.dictio["hbuttonbox2"].pack_start(combo)
-        combo.show()
-        combo.append_text("Choose another page..")
-        for n in range(1,10):
-            combo.append_text("page %s" % (str(n)))
-        combo.set_active(1)
-        combo.connect("changed", self._pageChangedCb)
 
-    def _retrieveThumbnail(self, url):
-        self.thumbnail = gtk.gdk.pixbuf_new_from_file(urlretrieve(url)[0])
-        return self.thumbnail
+        self.combo = gtk.combo_box_new_text()
+        self.dictio["hbuttonbox2"].pack_start(self.combo)
+        self.combo.show()
+        self.combo.append_text("Choose another page..")
+        for n in range(1,10):
+            self.combo.append_text("page %s" % (str(n)))
+        self.combo.set_active(1)
+        self.combo.connect("changed", self._pageChangedCb)
 
     def _createFileChooser(self):
         chooser = self.builder.get_object("filechooserwidget1")
         self.dictio["vbox2"].pack_start(chooser)
         self.dictio["vbox2"].remove(self.dictio["hbuttonbox1"])
-        self.dictio["vbox2"].pack_end(self.dictio["hbuttonbox1"], expand = False, fill = False)
-        self.builder.get_object("button1").show()
+        self.dictio["vbox2"].pack_end(self.dictio["hbuttonbox1"],
+         expand = False, fill = False)
+        self.dictio["button1"].show()
 
     def _createProgressBar(self):
-        self.builder.get_object("window1").unmaximize()
-        self.builder.get_object("window1").hide()
-        self.builder.get_object("window1").set_resizable(0)
+        self.dictio["window1"].unmaximize()
+        self.dictio["window1"].hide()
+        self.dictio["window1"].set_resizable(0)
         self.timestarted = time.time()
         self._progressBar = gtk.ProgressBar()
         self.previous_current = 0
         self.previous_timediff = 0
         self.count = 0
-        self._progressBar.set_size_request(300, -1)
+        self._progressBar.set_size_request(220, -1)
         self.vbox = gtk.VBox()
         self.vbox.pack_end(self._progressBar, expand = False, fill = False)
-        button2 = self.builder.get_object("button2")
-        self.builder.get_object("hbuttonbox1").remove(button2)
-        self.vbox.pack_end(button2, expand = False, fill = False)
+        self.dictio["hbuttonbox1"].remove(self.dictio["button2"])
+        self.vbox.pack_end(self.dictio["button2"], expand = False, fill = False)
         self.app.gui.sourcelist.pack_end(self.vbox, expand = False, fill = False)
         self.vbox.show()
         self.vbox.show_all()
-        button2.connect('clicked', self._quitImporterCb)
+        self.dictio["button2"].connect('clicked', self._quitImporterCb)
+        self.dictio["button2"].set_label("Cancel %s" % self.video_title[:20])
         self.downloading = 1
 
     def _downloadFileCompleteCb(self, data):
         """Method called after the file has downloaded"""
+        self.up = 0
         uri = "file://" + self.uri + "/" + self.video_title
         self.uri = uri[7:]
         "".join(uri)
-        self.uri = uri[7:]
-        print self.uri
         uri = [uri]
         if self.downloader.current != self.downloader.total :
-            os.remove(self.uri)       
+            os.remove(self.uri)
         else :
             try:
                 self.app.current.sources.addUris(uri)
-                print uri
             except SourceListError as error:
-                self.vbox.destroy()
+                pass
+
         self.vbox.destroy()
-        self.up = 0
-        self.builder.get_object("window1").destroy()
+        self.dictio["window1"].destroy()
+        self.app.gui.sourcelist.downloading -=1
         self.downloading = 0
 
     def _itemActivatedCb (self, data, data2):
@@ -156,13 +139,12 @@ class Downloader:
         self._downloadFile()
 
     def _newSearch(self, page = 0):
-        urlcleanup()
         self.dictio["entry1"].set_sensitive(0)
         self.dictio["entry1"].set_text("Searching...")
 
         self.storemodel = gtk.ListStore(str, gtk.gdk.Pixbuf, str)
-        self.builder.get_object("window1").maximize()
-        self.builder.get_object("window1").set_resizable(1)
+        self.dictio["window1"].maximize()
+        self.dictio["window1"].set_resizable(1)
         self.iconview = self.builder.get_object("iconview2")
         self.builder.get_object("entry1").set_text("Double-click a video or search another one...")
         self.builder.get_object("label1").set_text("Here are the videos that matched your query :")
@@ -183,18 +165,16 @@ class Downloader:
             self.builder.get_object("label1").show()
             self._packed = 1
             self.iconview.set_property("has_tooltip", True)
+      
         self.iconview.set_orientation(gtk.ORIENTATION_VERTICAL)
         self.iconview.set_text_column(COL_SHORT_TEXT)
         self.iconview.set_pixbuf_column(COL_ICON)
         self.iconview.set_tooltip_column (COL_TOOLTIP)
- 
+
 
 
     def _getInfosFinishedCb(self, a):
         self.dictio["entry1"].set_sensitive(1)
-        
-        
-
 
     def _uriChosenCb(self, data):
         self.uri = data.get_current_folder()
@@ -208,7 +188,7 @@ class Downloader:
         dest = (dest + "/" + self.video_title)
         "".join(dest)
         chooser = self.builder.get_object("filechooserwidget1")
-        self.builder.get_object("vbox2").remove(chooser)
+        self.dictio["vbox2"].remove(chooser)
         self.downloader = Downloader2(self.template, dest)
         self.downloader.connect("progress", self._progressCb)
         self.downloader.connect("finished", self._downloadFileCompleteCb)
@@ -219,21 +199,23 @@ class Downloader:
         try :
             self.up = 0
             self.downloader.canc.cancel()
-            os.remove(self.uri)
-            print "yo"
-            self.builder.get_object("window1").destroy()
+            if self.downloader.current != self.downloader.total :
+                os.remove(self.uri)
+            self.dictio["window1"].destroy()
         except :
             self.up = 0
-            self.builder.get_object("window1").destroy()
+            self.dictio["window1"].destroy()
 
     def _searchEntryCb(self, entry1):
         self._userquery = entry1.get_text()
-        self._newSearch()
+        self.combo.set_active(0)
+        self.page = 1
+        self._newSearch(0)
+
     def _deleteTextCb(self, entry1, unused_event) :
         entry1.set_text("")
 
     def _progressCb(self, data) :
-        print "salope", data
         current = self.downloader.current
         total = self.downloader.total
         fraction = (current/total)
@@ -243,16 +225,17 @@ class Downloader:
             speed = (current-self.previous_current)/(timediff-self.previous_timediff)
             remaining_time = (total-current) / speed
             self.builder.get_object("window1").set_title("%.0f%% downloaded at %.0f Kbps" % (fraction*100, speed/1000))
-            text = beautify_length(int(remaining_time * gst.SECOND))
+            text = beautify_length(int(remaining_time * SECOND))
             self._progressBar.set_text("About %s left" % text)
         if self.count == 400:
             self.previous_current = current
             self.previous_timediff = timediff
             self.count = 0
         self.count += 1
-    def _pageChangedCb (self, combo):
-        if combo.get_active() != 0:
-            self._newSearch(combo.get_active()+1)
+    def _pageChangedCb (self, unused_combo):
+        if self.combo.get_active() != 0 and self.combo.get_active() != self.page:
+            self.page = self.combo.get_active()
+            self._newSearch(self.combo.get_active()-1)
 
     def _saveInProjectFolderCb(self, unused_radiobutton):
         if self.toggled == 0:
@@ -261,5 +244,13 @@ class Downloader:
             self.toggled = 0
     def _retrievedCb(self, a, entry):
         if self.up :
+            if entry[0] == None :
+                print entry
+                thumb = gtk.gdk.pixbuf_new_from_file(os.path.join(get_pixmap_dir(),"error.png"))
+                self.storemodel.append(["Error !", thumb, "Error during the retrieval"])
+                print "hein"
+            else :
+                print entry
+                self.storemodel.append([entry[0], entry[1], entry[2]])
+            print "koi ?"
             self.iconview.set_model(self.storemodel)
-            self.storemodel.append([entry[0], entry[1], entry[2]])
