@@ -5,6 +5,7 @@ from pitivi.youtubedownloader import Downloader2, GDataQuerier
 
 from pitivi.sourcelist import SourceListError
 from pitivi.configure import get_pixmap_dir
+from time import sleep
 
 
 (COL_SHORT_TEXT,
@@ -139,8 +140,14 @@ class Downloader:
         self._downloadFile()
 
     def _newSearch(self, page = 0):
+        try :
+            self.delete(self.querier)
+            print "han"
+        except :
+            pass
         self.dictio["entry1"].set_sensitive(0)
         self.dictio["entry1"].set_text("Searching...")
+        self.list = []
 
         self.storemodel = gtk.ListStore(str, gtk.gdk.Pixbuf, str)
         self.dictio["window1"].maximize()
@@ -150,8 +157,8 @@ class Downloader:
         self.builder.get_object("label1").set_text("Here are the videos that matched your query :")
         
         self.querier = GDataQuerier()
-        self.test = self.querier.connect("info retrieved", self._retrievedCb)
         self.querier.connect('get infos finished', self._getInfosFinishedCb)
+        self.querier.connect('kill because of thread.error', self._quitImporterCb)
         result = self.querier.makeQuery(self._userquery, page)
         if result == "no video":
             self.builder.get_object("label1").set_text("No video matched your query")
@@ -173,8 +180,15 @@ class Downloader:
 
 
 
-    def _getInfosFinishedCb(self, a):
+    def _getInfosFinishedCb(self, a, info):
         self.dictio["entry1"].set_sensitive(1)
+        for entry in info :
+            if entry[0] == None :
+                thumb = gtk.gdk.pixbuf_new_from_file(os.path.join(get_pixmap_dir(),"error.png"))
+                self.storemodel.append(["Error !", thumb, "Error during the retrieval"])
+            else :
+                self.storemodel.append([entry[0], entry[1], entry[2]])
+        self.iconview.set_model(self.storemodel)
 
     def _uriChosenCb(self, data):
         self.uri = data.get_current_folder()
@@ -196,6 +210,7 @@ class Downloader:
         self._createProgressBar()
 
     def _quitImporterCb(self, unused = None):
+        self.app.gui.sourcelist.downloading -=1
         try :
             self.up = 0
             self.downloader.canc.cancel()
@@ -242,15 +257,3 @@ class Downloader:
             self.toggled = 1
         else :
             self.toggled = 0
-    def _retrievedCb(self, a, entry):
-        if self.up :
-            if entry[0] == None :
-                print entry
-                thumb = gtk.gdk.pixbuf_new_from_file(os.path.join(get_pixmap_dir(),"error.png"))
-                self.storemodel.append(["Error !", thumb, "Error during the retrieval"])
-                print "hein"
-            else :
-                print entry
-                self.storemodel.append([entry[0], entry[1], entry[2]])
-            print "koi ?"
-            self.iconview.set_model(self.storemodel)

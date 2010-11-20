@@ -14,6 +14,10 @@ import time
 from urllib2 import Request, urlopen, URLError
 from httplib import HTTPException
 from socket import error
+import Queue
+
+
+
 
 std_headers = {
     'User-Agent': 'Mozilla/5.0 (X11; U; Linux x86_64; en-US; rv:1.9.2.11) Gecko/20101019 Firefox/3.6.11',
@@ -54,7 +58,8 @@ class Downloader2(Signallable):
 class GDataQuerier(Signallable):
     __signals__ = {
         'info retrieved' : ["info"],
-        'get infos finished' : [],
+        'get infos finished' : ["info"],
+        'kill because of thread.error' : [],
         }
 
     def __init__(self):
@@ -96,50 +101,46 @@ class GDataQuerier(Signallable):
 
     def makeQuery(self, _userquery, page = 0):
         urlcleanup()
+        self.threadlist = []
+        self.list = []
         _query = gdata.youtube.service.YouTubeVideoQuery(text_query = _userquery)
         _query.start_index = page * 18 + 1
         _query.max_results = 18
         self.feed = self.yt_service.GetYouTubeVideoFeed(_query.ToUri())
         print _query.ToUri(), page
         if len(self.feed.entry) == 0:
-            return "no video"
-        self.cnt = 0
-        # strange bug :queuing threads makes search way faster, but crashes
-        # pitivi with segfault after 10 queries or so (never much before)
-        if len(self.feed.entry) > self.cnt:
-            thread = Thread(target = self._retrieveVideoInfo,
-            args = (self.feed.entry[self.cnt],))
-            thread.start()
-            self.cnt = self.cnt + 1
-        else :
             self.emit('get infos finished')
+            return "no video"
+        self.q = Queue.Queue()
+        for item in self.feed.entry:
+             self.q.put(item)
+        for e in self.feed.entry :
+             try :
+                 t = Thread(target=self.worker)
+                 t.daemon = True
+                 t.start()
+                 t.halt = 0
+             except Exception:
+                 self.emit('kill because of thread.error')
+        self.q.join()
+        self.emit('get infos finished', self.list)
+    def worker(self) :
+        while True :
+            item = self.q.get()
+            z = self._retrieveVideoInfo(item)
+            self.list.append(z)
+            self.q.task_done()       
 
     def _retrieveVideoInfo(self, entry):
         # Lots of errors to handle ..
         try :
             _video_link = entry.GetSwfUrl()
         except KeyError :
-            if  len(self.feed.entry) > self.cnt:
-                self.cnt = self.cnt + 1
-                thread = Thread(target = self._retrieveVideoInfo, args = (self.feed.entry[self.cnt],))
-                thread.start()
-                self.emit('info retrieved', (None, None, None))
-            else :
-                self.emit('get infos finished')
-                return
-            return
+            return(None, None, None)
         try :
             index = _video_link.index("?")
         except AttributeError:
-            if len(self.feed.entry) > self.cnt:
-                thread = Thread(target = self._retrieveVideoInfo, args = (self.feed.entry[self.cnt],))
-                thread.start()
-                self.cnt = self.cnt + 1
-                self.emit('info retrieved', (None, None, None))
-            else :
-                self.emit('get infos finished')
-                return
-            return
+            return (None, None, None)
         self.videoids_list.append(_video_link[index-11 : index])
         title = entry.media.title.text
         l = len(title)
@@ -147,45 +148,20 @@ class GDataQuerier(Signallable):
         for e in range(1, div):
             title = title[:e*30] + "\n" + title[e*30:]
         self.title_list.append(title)
-        display_title = title[:20]
+        display_title = title[:15]
         try :
             title = escape(title).encode( "utf-8" )
         except UnicodeDecodeError :
-            if len(self.feed.entry) > self.cnt: 
-                thread = Thread(target = self._retrieveVideoInfo, args = (self.feed.entry[self.cnt],))
-                thread.start()
-                self.cnt = self.cnt + 1
-                self.emit('info retrieved', (None, None, None))
-            else :
-                self.emit('get infos finished')
-                return
-            return
+            return (None, None, None)
         try :
             thumb = self._retrieveThumbnail(entry.media.thumbnail[0].url)
-            print entry.media.thumbnail[0].url
-        except :
-            if len(self.feed.entry) > self.cnt:
-                thread = Thread(target = self._retrieveVideoInfo, args = (self.feed.entry[self.cnt],))
-                self.emit('info retrieved', (None, None, None))
-                thread.start()
-                self.cnt = self.cnt + 1
-            else :
-                self.emit('get infos finished')
-                return
-            return
             self.thumbnail_list.append(thumb)
+        except :
+            return (None, None, None)
         duration = entry.media.duration.seconds
         self.duration_list.append(duration)
         tooltip = title + "\n" + "duration : %.0f seconds" % (float(duration))
-        self.emit('info retrieved', (display_title, thumb, tooltip))
-        if len(self.feed.entry) > self.cnt:
-            thread = Thread(target = self._retrieveVideoInfo, args = (self.feed.entry[self.cnt],))
-            thread.start()
-            self.cnt = self.cnt + 1
-        else :
-            self.emit('get infos finished')
-            return
-
+        return (display_title, thumb, tooltip)
     def _retrieveThumbnail(self, url):
         self.thumbnail = gtk.gdk.pixbuf_new_from_file(urlretrieve(url)[0])
         return self.thumbnail
