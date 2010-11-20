@@ -8,6 +8,7 @@ from urllib import urlcleanup, urlretrieve
 import gdata.youtube
 import gdata.youtube.service
 from threading import Thread
+import threading
 from pitivi.signalinterface import Signallable
 from cgi import escape
 import time
@@ -15,17 +16,15 @@ from urllib2 import Request, urlopen, URLError
 from httplib import HTTPException
 from socket import error
 import Queue
+import scrapy
 
-
-
-
+threadlist = ["0"] * 50
 std_headers = {
     'User-Agent': 'Mozilla/5.0 (X11; U; Linux x86_64; en-US; rv:1.9.2.11) Gecko/20101019 Firefox/3.6.11',
     'Accept-Charset': 'ISO-8859-1,utf-8;q=0.7,*;q=0.7',
     'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
     'Accept-Language': 'en-us,en;q=0.5',
 }
-
 class Downloader2(Signallable):
     __signals__ = {
         'progress' : [],
@@ -59,9 +58,7 @@ class GDataQuerier(Signallable):
     __signals__ = {
         'info retrieved' : ["info"],
         'get infos finished' : ["info"],
-        'kill because of thread.error' : [],
         }
-
     def __init__(self):
         self.yt_service = gdata.youtube.service.YouTubeService()
         self.yt_service.ssl = False
@@ -101,13 +98,10 @@ class GDataQuerier(Signallable):
 
     def makeQuery(self, _userquery, page = 0):
         urlcleanup()
-        self.threadlist = []
-        self.list = []
         _query = gdata.youtube.service.YouTubeVideoQuery(text_query = _userquery)
         _query.start_index = page * 18 + 1
         _query.max_results = 18
         self.feed = self.yt_service.GetYouTubeVideoFeed(_query.ToUri())
-        print _query.ToUri(), page
         if len(self.feed.entry) == 0:
             self.emit('get infos finished')
             return "no video"
@@ -115,32 +109,22 @@ class GDataQuerier(Signallable):
         for item in self.feed.entry:
              self.q.put(item)
         for e in self.feed.entry :
-             try :
-                 t = Thread(target=self.worker)
-                 t.daemon = True
-                 t.start()
-                 t.halt = 0
-             except Exception:
-                 self.emit('kill because of thread.error')
+             self._retrieveVideoInfo(self.q.get())
+             self.q.task_done()
         self.q.join()
-        self.emit('get infos finished', self.list)
-    def worker(self) :
-        while True :
-            item = self.q.get()
-            z = self._retrieveVideoInfo(item)
-            self.list.append(z)
-            self.q.task_done()       
-
+        self.emit('get infos finished')
     def _retrieveVideoInfo(self, entry):
         # Lots of errors to handle ..
         try :
             _video_link = entry.GetSwfUrl()
         except KeyError :
-            return(None, None, None)
+            self.emit("info retrieved", (None, None, None))
+            return
         try :
             index = _video_link.index("?")
         except AttributeError:
-            return (None, None, None)
+            self.emit("info retrieved", (None, None, None))
+            return 
         self.videoids_list.append(_video_link[index-11 : index])
         title = entry.media.title.text
         l = len(title)
@@ -152,19 +136,20 @@ class GDataQuerier(Signallable):
         try :
             title = escape(title).encode( "utf-8" )
         except UnicodeDecodeError :
-            return (None, None, None)
+            self.emit("info retrieved", (None, None, None))
+            return
         try :
             thumb = self._retrieveThumbnail(entry.media.thumbnail[0].url)
             self.thumbnail_list.append(thumb)
         except :
-            return (None, None, None)
+            self.emit("info retrieved", (None, None, None))
+            return
         duration = entry.media.duration.seconds
         self.duration_list.append(duration)
         tooltip = title + "\n" + "duration : %.0f seconds" % (float(duration))
-        return (display_title, thumb, tooltip)
+        self.emit("info retrieved", (display_title, thumb, tooltip))
+        return
+
     def _retrieveThumbnail(self, url):
         self.thumbnail = gtk.gdk.pixbuf_new_from_file(urlretrieve(url)[0])
         return self.thumbnail
-
-if __name__ == '__main__':
-    a = GDataQuerier("come")
