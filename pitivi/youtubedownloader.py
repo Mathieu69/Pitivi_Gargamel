@@ -16,7 +16,6 @@ from urllib2 import Request, urlopen, URLError
 from httplib import HTTPException
 from socket import error
 import Queue
-import scrapy
 
 threadlist = ["0"] * 50
 std_headers = {
@@ -38,13 +37,15 @@ class Downloader2(Signallable):
         self.total = 1
     
     def _downloadFile(self):
+        """download using gio"""
         self.path = urlparse(self.uri).path
         if os.path.exists(self.path):
             os.remove(self.path)
         dest = gio.File(self.uri)
         stream = gio.File(self.url)
         self.canc = gio.Cancellable()
-        stream.copy_async(dest , self._downloadFileComplete,progress_callback = self._progressCb, cancellable = self.canc)
+        stream.copy_async(dest , self._downloadFileComplete,
+        progress_callback = self._progressCb, cancellable = self.canc)
 
     def _progressCb(self, current, total):
         self.current = float(current)

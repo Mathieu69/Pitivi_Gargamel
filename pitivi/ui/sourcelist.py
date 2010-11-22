@@ -45,8 +45,17 @@ from pitivi.ui.youtubedownloader import Downloader
 from pitivi.log.loggable import Loggable
 from pitivi.sourcelist import SourceListError
 
+from urllib2 import urlopen, Request
+
 SHOW_TREEVIEW = 1
 SHOW_ICONVIEW = 2
+
+std_headers = {
+    'User-Agent': 'Mozilla/5.0 (X11; U; Linux x86_64; en-US; rv:1.9.2.11) Gecko/20101019 Firefox/3.6.11',
+    'Accept-Charset': 'ISO-8859-1,utf-8;q=0.7,*;q=0.7',
+    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+    'Accept-Language': 'en-us,en;q=0.5',
+}
 
 GlobalSettings.addConfigSection('clip-library')
 GlobalSettings.addConfigOption('lastImportFolder',
@@ -118,6 +127,7 @@ class SourceList(gtk.VBox, Loggable):
         self.app = instance
         self.settings = instance.settings
         self.downloading = 0
+        self.importerUp = 0
 
         # Store
         # icon, infotext, objectfactory, uri, length
@@ -295,6 +305,8 @@ class SourceList(gtk.VBox, Loggable):
         actiongroup.add_actions(actions)
         actiongroup.get_action("ImportSources").props.is_important = True
         uiman.insert_action_group(actiongroup, 0)
+        if not self._testInternet():
+            actiongroup.get_action("ImportFromYouTube").set_sensitive(False)
 
         self.selection_actions = gtk.ActionGroup("sourcelistselection")
         self.selection_actions.add_actions(selection_actions)
@@ -339,6 +351,16 @@ class SourceList(gtk.VBox, Loggable):
         # display the help text
         self.clip_view = self.settings.lastClipView
         self._displayClipView()
+
+    def _testInternet(self):
+        request = Request("http://www.google.com", None, std_headers)
+        try :
+            urlopen(request)
+            self.debug("Internet Available")
+            return 1
+        except :
+            self.debug("No Internet")
+            return
 
     def _importSourcesCb(self, unused_action):
         self.showImportSourcesDialog()
@@ -447,9 +469,11 @@ class SourceList(gtk.VBox, Loggable):
         self.infobar.show()
 
     def showImportFromYouTubeDialog(self):
-        if self.downloading < 3:
-            a = Downloader(self.app)
+        print self.downloading, self.importerUp
+        if self.downloading < 3 and self.importerUp == 0:
             self.downloading += 1
+            self.importerUp = 1
+            a = Downloader(self.app) 
         else :
             pass
 
