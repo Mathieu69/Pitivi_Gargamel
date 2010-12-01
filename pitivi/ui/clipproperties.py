@@ -75,6 +75,7 @@ class ClipProperties(gtk.ScrolledWindow, Loggable):
         self._project = None
         self.transformation_expander = None
         self.info_bar_box = gtk.VBox()
+        self.set_homogeneous(False)
 
         vbox = gtk.VBox()
         vp.add(vbox)
@@ -99,6 +100,12 @@ class ClipProperties(gtk.ScrolledWindow, Loggable):
         self.effect_expander.show()
         vbox.show()
         vp.show()
+        self.speed_expander = SpeedProperties(instance)
+
+        vbox.pack_start(self.effect_expander, expand=False, fill=False)
+        vbox.pack_end(self.speed_expander, expand=False, fill=False)
+
+        self.speed_expander.show()
         self.show()
 
     def _setProject(self, project):
@@ -133,13 +140,10 @@ class EffectProperties(gtk.Expander, gtk.HBox):
     """
     Widget for viewing and configuring effects
     """
-    # Note: This should be inherited from gtk.Expander when we get other things
-    # to put in ClipProperties, that is why this is done this way
 
     def __init__(self, instance, effect_properties_handling, clip_properties):
         gtk.Expander.__init__(self)
         gtk.HBox.__init__(self)
-        #self.set_expanded(True)
 
         self.selected_effects = []
         self.timeline_objects = []
@@ -220,7 +224,6 @@ class EffectProperties(gtk.Expander, gtk.HBox):
             gtk.gdk.ACTION_COPY)
 
         self.selection = self.treeview.get_selection()
-
         self.selection.connect("changed", self._treeviewSelectionChangedCb)
         self._removeEffectBt.connect("clicked", self._removeEffectClicked)
 
@@ -240,6 +243,7 @@ class EffectProperties(gtk.Expander, gtk.HBox):
         self._showInfoBar()
         self._vcontent.show()
         self.set_expanded(True)
+
         self.set_label(_("Effects"))
         self.connect('notify::expanded', self._expandedCb)
 
@@ -628,3 +632,28 @@ class TransformationProperties(gtk.Expander):
             self.timeline.connect('selection-changed', self._selectionChangedCb)
 
     timeline = property(_getTimeline, _setTimeline)
+
+
+class SpeedProperties(gtk.Expander, gtk.HBox):
+    """
+    Widget for viewing and configuring speed
+    """
+
+    def __init__(self, instance):
+        gtk.Expander.__init__(self)
+        gtk.HBox.__init__(self)
+        self.speedtable = gtk.VBox()
+        _label = gtk.Label("Hello world")
+        self.speedtable.pack_start(_label, expand=False, fill=False)
+        self.speedtable.show_all()
+        self.add(self.speedtable)
+        self.connect('notify::expanded', self._expandedCb)
+
+    def _expandedCb(self, expander, params):
+        self._updateAll()
+
+    def _updateAll(self):
+        if self.get_expanded():
+            self.speedtable.show()
+        else:
+            self.speedtable.hide()
