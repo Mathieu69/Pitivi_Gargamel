@@ -2,13 +2,6 @@
 <interface>
   <requires lib="gtk+" version="2.16"/>
   <!-- interface-naming-policy project-wide -->
-  <object class="GtkFileChooserWidget" id="filechooserwidget1">
-    <property name="visible">True</property>
-    <property name="orientation">vertical</property>
-    <property name="action">select-folder</property>
-    <signal name="file_activated" handler="_uriChosenCb"/>
-    <signal name="selection_changed" handler="_uriChosenCb"/>
-  </object>
   <object class="GtkScrolledWindow" id="scrolledwindow1">
     <property name="visible">True</property>
     <property name="can_focus">True</property>
@@ -19,6 +12,7 @@
         <property name="visible">True</property>
         <property name="can_focus">True</property>
         <signal name="item_activated" handler="_itemActivatedCb"/>
+        <signal name="selection_changed" handler="_selectionChangedCb"/>
       </object>
     </child>
   </object>
@@ -26,9 +20,9 @@
     <property name="width_request">350</property>
     <property name="visible">True</property>
     <property name="border_width">10</property>
-    <property name="title" translatable="yes">YouTube Importer</property>
-    <property name="type_hint">dialog</property>
-    <property name="skip_taskbar_hint">True</property>
+    <property name="title" translatable="yes">Archive Importer</property>
+    <property name="resizable">False</property>
+    <property name="window_position">center-always</property>
     <signal name="destroy" handler="_quitImporterCb"/>
     <child>
       <object class="GtkVBox" id="vbox2">
@@ -42,7 +36,8 @@
                 <property name="visible">True</property>
                 <property name="can_focus">True</property>
                 <property name="invisible_char">&#x25CF;</property>
-                <property name="text" translatable="yes">Press enter to search...</property>
+                <property name="width_chars">35</property>
+                <property name="text" translatable="yes">Press enter to search or retrieve a specific url...</property>
                 <signal name="activate" handler="_searchEntryCb"/>
               </object>
               <packing>
@@ -105,13 +100,41 @@
                 <property name="label" translatable="yes">Download</property>
                 <property name="can_focus">True</property>
                 <property name="receives_default">True</property>
-                <signal name="clicked" handler="_downloadFileCb"/>
               </object>
               <packing>
                 <property name="expand">False</property>
                 <property name="fill">False</property>
                 <property name="position">1</property>
               </packing>
+            </child>
+            <child>
+              <object class="GtkButton" id="button3">
+                <property name="label" translatable="yes">Preview</property>
+                <property name="can_focus">True</property>
+                <property name="receives_default">True</property>
+                <signal name="clicked" handler="_previewCb"/>
+              </object>
+              <packing>
+                <property name="expand">False</property>
+                <property name="fill">False</property>
+                <property name="position">2</property>
+              </packing>
+            </child>
+            <child>
+              <object class="GtkButton" id="button4">
+                <property name="label" translatable="yes">Choose a format</property>
+                <property name="can_focus">True</property>
+                <property name="receives_default">True</property>
+                <signal name="clicked" handler="_downloadSelectedCb"/>
+              </object>
+              <packing>
+                <property name="expand">False</property>
+                <property name="fill">False</property>
+                <property name="position">3</property>
+              </packing>
+            </child>
+            <child>
+              <placeholder/>
             </child>
           </object>
           <packing>
@@ -126,7 +149,7 @@
     <property name="visible">True</property>
     <child>
       <object class="GtkCheckButton" id="checkbutton1">
-        <property name="label" translatable="yes">Save in current project</property>
+        <property name="label" translatable="yes">Save in current project (if there is one)</property>
         <property name="visible">True</property>
         <property name="can_focus">True</property>
         <property name="receives_default">False</property>

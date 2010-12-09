@@ -58,6 +58,34 @@ def time_to_string(value):
     mins = mins % 60
     return "%02d:%02d:%02d.%03d" % (hours, mins, sec, ms)
 
+def testConnection():
+    bus = dbus.SystemBus()
+
+    proxy = bus.get_object("org.freedesktop.NetworkManager", "/org/freedesktop/NetworkManager")
+    manager = dbus.Interface(proxy, "org.freedesktop.NetworkManager")
+
+    manager_prop_iface = dbus.Interface(proxy, "org.freedesktop.DBus.Properties")
+    active = manager_prop_iface.Get("org.freedesktop.NetworkManager", "ActiveConnections")
+    for a in active:
+        ac_proxy = bus.get_object("org.freedesktop.NetworkManager", a)
+        prop_iface = dbus.Interface(ac_proxy, "org.freedesktop.DBus.Properties")
+        state = prop_iface.Get("org.freedesktop.NetworkManager.Connection.Active", "State")
+
+        con_path = prop_iface.Get("org.freedesktop.NetworkManager.Connection.Active", "Connection")
+        con_service = prop_iface.Get("org.freedesktop.NetworkManager.Connection.Active", "ServiceName")
+
+        service_proxy = bus.get_object(con_service, con_path)
+        con_iface = dbus.Interface(service_proxy, "org.freedesktop.NetworkManagerSettings.Connection")
+        con_details = con_iface.GetSettings()
+        con_name = con_details['connection']['id']
+
+        if state == 2: # activated
+            return 1
+        else:
+            return
+
+
+
 def beautify_length(length):
     """
     Converts the given time in nanoseconds to a human readable string

@@ -38,10 +38,10 @@ from pitivi.signalgroup import SignalGroup
 from pitivi.stream import VideoStream, AudioStream, TextStream, \
         MultimediaStream
 from pitivi.settings import GlobalSettings
-from pitivi.utils import beautify_length
+from pitivi.utils import beautify_length, testConnection
 from pitivi.ui.common import beautify_factory, factory_name, \
     beautify_stream, PADDING
-from pitivi.ui.youtubedownloader import Downloader
+from pitivi.ui.webarchive import ArchiveDownloader
 from pitivi.log.loggable import Loggable
 from pitivi.sourcelist import SourceListError
 
@@ -94,7 +94,7 @@ ui = '''
             <placeholder name="SourceList" >
                 <menuitem action="ImportSources" />
                 <menuitem action="ImportSourcesFolder" />
-                <menuitem action="ImportFromYouTube" />
+                <menuitem action="ImportFromArchive" />
                 <menuitem action="RemoveSources" />
                 <separator />
                 <menuitem action="InsertEnd" />
@@ -287,8 +287,8 @@ class SourceList(gtk.VBox, Loggable):
             ("ImportSourcesFolder", gtk.STOCK_ADD,
                 _("Import _folder of clips..."), None,
                 _("Import folder of clips to use"), self._importSourcesFolderCb),
-            ("ImportFromYouTube", gtk.STOCK_ADD, _("_Import from YouTube..."),
-                None, _("Import clips from YouTube"), self._importFromYouTubeCb),
+            ("ImportFromArchive", gtk.STOCK_ADD, _("_Import from Archive..."),
+                None, _("Import clips from Archive"), self._importFromArchiveCb),
         )
 
         # only available when selection is non-empty 
@@ -305,8 +305,6 @@ class SourceList(gtk.VBox, Loggable):
         actiongroup.add_actions(actions)
         actiongroup.get_action("ImportSources").props.is_important = True
         uiman.insert_action_group(actiongroup, 0)
-        if not self._testInternet():
-            actiongroup.get_action("ImportFromYouTube").set_sensitive(False)
 
         self.selection_actions = gtk.ActionGroup("sourcelistselection")
         self.selection_actions.add_actions(selection_actions)
@@ -352,21 +350,11 @@ class SourceList(gtk.VBox, Loggable):
         self.clip_view = self.settings.lastClipView
         self._displayClipView()
 
-    def _testInternet(self):
-        request = Request("http://www.google.com", None, std_headers)
-        try :
-            urlopen(request)
-            self.debug("Internet Available")
-            return 1
-        except :
-            self.debug("No Internet")
-            return
-
     def _importSourcesCb(self, unused_action):
         self.showImportSourcesDialog()
 
-    def _importFromYouTubeCb(self, unused_action):
-        self.showImportFromYouTubeDialog()
+    def _importFromArchiveCb(self, unused_action):
+        self.showImportFromArchiveDialog()
 
     def _importSourcesFolderCb(self, unused_action):
         self.showImportSourcesDialog(True)
@@ -468,12 +456,12 @@ class SourceList(gtk.VBox, Loggable):
         self.txtlabel.show()
         self.infobar.show()
 
-    def showImportFromYouTubeDialog(self):
+    def showImportFromArchiveDialog(self):
         print self.downloading, self.importerUp
-        if self.downloading < 3 and self.importerUp == 0:
+        if self.downloading < 3 and self.importerUp == 0 and testConnection:
             self.downloading += 1
             self.importerUp = 1
-            a = Downloader(self.app) 
+            a = ArchiveDownloader(self.app) 
         else :
             pass
 
