@@ -41,7 +41,7 @@ from pitivi.settings import GlobalSettings
 from pitivi.utils import beautify_length, testConnection
 from pitivi.ui.common import beautify_factory, factory_name, \
     beautify_stream, PADDING
-from pitivi.ui.webarchive import ArchiveDownloader
+from pitivi.ui.remoteimport import RemoteDownloader
 from pitivi.log.loggable import Loggable
 from pitivi.sourcelist import SourceListError
 
@@ -94,7 +94,7 @@ ui = '''
             <placeholder name="SourceList" >
                 <menuitem action="ImportSources" />
                 <menuitem action="ImportSourcesFolder" />
-                <menuitem action="ImportFromArchive" />
+                <menuitem action="ImportFromRemote" />
                 <menuitem action="RemoveSources" />
                 <separator />
                 <menuitem action="InsertEnd" />
@@ -287,8 +287,8 @@ class SourceList(gtk.VBox, Loggable):
             ("ImportSourcesFolder", gtk.STOCK_ADD,
                 _("Import _folder of clips..."), None,
                 _("Import folder of clips to use"), self._importSourcesFolderCb),
-            ("ImportFromArchive", gtk.STOCK_ADD, _("_Import from Archive..."),
-                None, _("Import clips from Archive"), self._importFromArchiveCb),
+            ("ImportFromRemote", gtk.STOCK_ADD, _("_Import from Remote..."),
+                None, _("Import clips from Remote"), self._importFromRemoteCb),
         )
 
         # only available when selection is non-empty 
@@ -353,8 +353,8 @@ class SourceList(gtk.VBox, Loggable):
     def _importSourcesCb(self, unused_action):
         self.showImportSourcesDialog()
 
-    def _importFromArchiveCb(self, unused_action):
-        self.showImportFromArchiveDialog()
+    def _importFromRemoteCb(self, unused_action):
+        self.showImportFromRemoteDialog()
 
     def _importSourcesFolderCb(self, unused_action):
         self.showImportSourcesDialog(True)
@@ -456,12 +456,12 @@ class SourceList(gtk.VBox, Loggable):
         self.txtlabel.show()
         self.infobar.show()
 
-    def showImportFromArchiveDialog(self):
+    def showImportFromRemoteDialog(self):
         print self.downloading, self.importerUp
         if self.downloading < 3 and self.importerUp == 0 and testConnection:
             self.downloading += 1
             self.importerUp = 1
-            a = ArchiveDownloader(self.app) 
+            a = RemoteDownloader(self.app) 
         else :
             pass
 

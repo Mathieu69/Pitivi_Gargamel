@@ -32,13 +32,24 @@
             <property name="visible">True</property>
             <property name="border_width">5</property>
             <child>
-              <object class="GtkEntry" id="entry1">
+              <object class="GtkHBox" id="hbox1">
                 <property name="visible">True</property>
-                <property name="can_focus">True</property>
-                <property name="invisible_char">&#x25CF;</property>
-                <property name="width_chars">35</property>
-                <property name="text" translatable="yes">Press enter to search or retrieve a specific url...</property>
-                <signal name="activate" handler="_searchEntryCb"/>
+                <child>
+                  <object class="GtkEntry" id="entry1">
+                    <property name="visible">True</property>
+                    <property name="can_focus">True</property>
+                    <property name="invisible_char">&#x25CF;</property>
+                    <property name="width_chars">35</property>
+                    <property name="text" translatable="yes">Search..</property>
+                    <signal name="activate" handler="_searchEntryCb"/>
+                  </object>
+                  <packing>
+                    <property name="position">0</property>
+                  </packing>
+                </child>
+                <child>
+                  <placeholder/>
+                </child>
               </object>
               <packing>
                 <property name="expand">False</property>
@@ -182,4 +193,5 @@
       <placeholder/>
     </child>
   </object>
+  <object class="GtkListStore" id="liststore1"/>
 </interface>
