@@ -27,10 +27,10 @@ class RemoteDownloader:
         self._createUi()
         self._packed = 0
         self.toggled = 1
-        self.thumbnail_list = []
         self.pixdir = os.path.join(get_pixmap_dir(),"Remote/")
         self.previewer = 0
         self.combo2 = 0
+        self.lock = thread.allocate_lock()
 
     def _createUi(self) :
         if 'pitivi.exe' in __file__.lower():
@@ -52,13 +52,13 @@ class RemoteDownloader:
             self.dictio[e] = self.builder.get_object(e)
         self.dictio["entry1"].connect('button-press-event',
          self._deleteTextCb)
-        self.combo3 = gtk.combo_box_new_text()
+        self.combo3 = gtk.combo_box_new_text()          #Repo chooser combobox
         self.dictio['hbox1'].pack_end(self.combo3, expand = False, fill = False)
         self.combo3.show()
         self.combo3.append_text('Archive')
         self.combo3.append_text('Blip')
         self.combo3.set_active(0)
-        self.combo = gtk.combo_box_new_text()
+        self.combo = gtk.combo_box_new_text()           #Page chooser combobox
         self.dictio["hbuttonbox1"].pack_end(self.combo)
         self.combo.show()
         self.combo.append_text("Choose another page..")
@@ -70,118 +70,23 @@ class RemoteDownloader:
         self.dictio["vbox1"].pack_end(self.dictio['hbuttonbox2']
             , expand = False, fill = False)
 
-    def blipThread(self, bogus):
-        self.origin = 'blip'
-        self.combo.set_active(1)
-        self.blipquerier = BlipIE()
-        for e in range(4):
-            self.result = self.blipquerier.search(self._userquery, e + 1)
-            for element in self.result :
-                self.resultlist.append(element)
-        self.thumburis = []
-        if not len(self.resultlist):
-            self.dictio['entry1'].set_sensitive(1)
-            self.dictio['entry1'].set_text('Search..')
-            self.dictio['label1'].set_text('No video matched your query')
-            self.dictio['label1'].show()
-            return
-        for result in self.resultlist:
-            thread.start_new_thread(self.thumbRetriever, (result,))
-        gobject.timeout_add(5000, self._searchDone)
-
     def search(self):
-        self.page = 0
-        if self.combo2:
-            self.combo2.destroy()
-        self.dictio['entry1'].set_sensitive(0)
-        self.dictio['entry1'].set_text('Searching...')
-        self.querier = WebArchiveIE()
-        self.resultlist = []
-        if self.combo3.get_active() == 0:
-            self.origin = 'archive'
-            self.combo.set_active(0)
-            self.combo.set_active(1)
-            return
-        elif self.combo3.get_active() == 1:
-            thread.start_new_thread(self.blipThread, (None,))
+        """ Common search function for both platforms and pages"""
+        self.combo.hide()
+        self.cnt = 0
+        self.thumbcnt = 0
+        self.index = 0
 
-
-    def mainthread(self, query):
-        self.thumburis = []
-        self.namelist = []
-        self.thumblist = []
-        filled = 0
-        if self.page:
-            feed = self.querier.main(query, self.page)
-        else:
-            feed = self.querier.main(query)
-        for element in feed:
-            if 'thumbCell' in feed[element][0] :
-                filled = 1
-        if not filled :
-            self.dictio['entry1'].set_sensitive(1)
-            self.dictio['entry1'].set_text('Search..')
-            self.dictio['label1'].set_text('No video matched your query')
-            self.dictio['label1'].show()
-            return
-        for element in feed:
-            name = self.querier.specThumb(feed[element])
-            if name != []:
-                for e in name :
-                    if e != None:
-                        self.thumblist.append(e)
-        for element in self.thumblist:
-            e = element.split("/")[2]
-            self.namelist.append(e)
-        self.shown = 0
-        self.errorCount = 0
-        self.valid = 0
-        count = 0
-        for element in self.thumblist:
-            template = "".join("http://www.archive.org" + element)
-            name = self.namelist[count]
-            thread.start_new_thread(self.thumbRetriever, ([name, name, template],))
-            count = count + 1
-        self.update = 1
-        self.progresscount = 0
-        gobject.timeout_add(10000, self._searchDone)
-
-    def thumbRetriever(self, result):
-        a = self.querier._retrieveThumb(result[2])
-        try :
-            thumb = gtk.gdk.pixbuf_new_from_file(a[0])
-            thumb = thumb.scale_simple(160, 120, gtk.gdk.INTERP_NEAREST)
-        except :
-            thumb = gtk.gdk.pixbuf_new_from_file(os.path.join(get_pixmap_dir()
-        ,"error.png"))
-            thumb = thumb.scale_simple(160, 120, gtk.gdk.INTERP_NEAREST)
-        self.thumburis.append((thumb, result[1], result[0]))
-
-    def _searchDone(self):
-        self.combo.set_sensitive(1)
-        if self.origin == 'blip':
-            self.builder.get_object('button4').set_label('Download')
-        self.combo.show()
-        self.dictio['entry1'].set_sensitive(1)
-        self.dictio['entry1'].set_text('Search..')
-        self.update = 0
-
+        self.combo.set_sensitive(0)
+        self.dictio['button4'].hide()
+        self.dictio['button3'].hide()
         self.storemodel = gtk.ListStore(str, gtk.gdk.Pixbuf, str)
-        self.builder.get_object("label1").set_text(
-            "Here are the videos that matched your query :")
-
         self.dictio["iconview2"].set_orientation(gtk.ORIENTATION_VERTICAL)
         self.dictio["iconview2"].set_text_column(COL_SHORT_TEXT)
         self.dictio["iconview2"].set_pixbuf_column(COL_ICON)
         self.dictio["iconview2"].set_tooltip_column (COL_TOOLTIP)
-        self.dictio["button3"].show()
-        self.dictio["button4"].show()
-        self.dictio["button3"].set_sensitive(0)
-        self.dictio["button4"].set_sensitive(0)
-        count = 0
         self.dictio["iconview2"].set_model(self.storemodel)
-        self.thumburis.reverse()
-                # If it's the first search, we keep the same window
+
         if self._packed == 0:
             self.dictio["window1"].set_resizable(1)
             self.dictio["window1"].resize(1024, 768)
@@ -190,11 +95,141 @@ class RemoteDownloader:
             self.builder.get_object("label1").show()
             self._packed = 1
             self.dictio["iconview2"].set_property("has_tooltip", True)
-        for e in self.thumburis :
+            self.dictio["iconview2"].set_columns(5)
+        if self.combo2:                             #FIXME : No easy way to clear a combobox created
+            self.combo2.destroy()                   #with the convenience function.
+        self.dictio['entry1'].set_sensitive(0)
+        self.dictio['entry1'].set_text('Searching...')
+
+        self.querier = WebArchiveIE()
+        self.resultlist = []
+        if self.combo3.get_active() == 0:
+            self.origin = 'archive'
+            thread.start_new_thread(self.mainthread, (self._userquery,))
+            return
+        elif self.combo3.get_active() == 1:
+            thread.start_new_thread(self.blipThread, (None,))
+
+
+    def blipThread(self, bogus):
+        self.thumburis = []
+        self.origin = 'blip'
+        self.blipquerier = BlipIE()
+        for e in range(4):
+            pages = (self.page * 4 + e + 1)
+            self.result = self.blipquerier.search(self._userquery, pages)
+            for element in self.result :
+                self.resultlist.append(element)
+
+        if not len(self.resultlist) or self.resultlist[0] == None:
+            self.dictio['entry1'].set_sensitive(1)
+            self.dictio['entry1'].set_text('Search..')
+            self.dictio['label1'].set_text('No video matched your query')
+            self.dictio['label1'].show()
+            return
+        for result in self.resultlist:
+            thread.start_new_thread(self.thumbRetriever, (result,))
+        gobject.timeout_add(50, self._update)
+
+    def mainthread(self, query):
+        self.thumburis = []
+        self.namelist = []
+        self.thumblist = []
+        filled = 0
+
+        if self.page:
+            feed = self.querier.main(query, self.page + 1)
+        else:
+            feed = self.querier.main(query)
+        for element in feed:
+            if 'thumbCell' in feed[element][0] :
+                filled = 1
+
+        if not filled :
+            self.dictio['entry1'].set_sensitive(1)
+            self.dictio['entry1'].set_text('Search..')
+            self.dictio['label1'].set_text('No video matched your query')
+            self.dictio['label1'].show()
+            return
+
+        for element in feed:
+            name = self.querier.specThumb(feed[element])
+            if name != []:
+                for e in name :
+                    if e != None:
+                        self.thumblist.append(e)
+
+        for element in self.thumblist:
+            e = element.split("/")[2]
+            self.namelist.append(e)
+        self.shown = 0
+        count = 0
+
+        for element in self.thumblist:
+            template = "".join("http://www.archive.org" + element)
+            name = self.namelist[count]
+            thread.start_new_thread(self.thumbRetriever, ([name, name, template],))
+            count = count + 1
+
+        self.progresscount = 0
+        gobject.timeout_add(50, self._update)
+
+    def _update(self):
+        self.lock.acquire()
+        cnt = 0
+        for e in self.thumburis[self.index :]:
+            cnt += 1
+            name = e[1]
+            self.storemodel.append([name[:15], e[0], name])
+        self.index = self.index + cnt
+        self.lock.release()
+        self.cnt += 1
+        if self.origin == 'archive' and len(self.thumburis) < 50 and self.cnt < 150:
+            gobject.timeout_add(50, self._update)
+        elif self.cnt < 100 :
+            gobject.timeout_add(50, self._update)
+        if self.origin == 'blip' and self.cnt == 100 or len(self.thumburis) == 30:
+            self._searchDone()
+        if len(self.thumburis) == 50 or self.cnt == 150:
+            self._searchDone()
+
+    def thumbRetriever(self, result):
+        a = self.querier._retrieveThumb(result[2])
+        try :
+            thumb = gtk.gdk.pixbuf_new_from_file(a[0])
+            if self.origin == 'blip':
+                thumb = thumb.scale_simple(160, 120, gtk.gdk.INTERP_BILINEAR)
+        except :
+            thumb = gtk.gdk.pixbuf_new_from_file(os.path.join(get_pixmap_dir()
+        ,"error.png"))
+            if self.origin == 'blip':
+                thumb = thumb.scale_simple(160, 120, gtk.gdk.INTERP_BILINEAR)
+        name = result[1]
+        self.thumburis.append((thumb, result[1], result[0]))
+
+    def _searchDone(self):
+        self.dictio['button4'].show()
+        self.dictio['button3'].show()
+        self.combo.set_sensitive(1)
+        if self.origin == 'blip':
+            self.builder.get_object('button4').set_label('Download')
+        self.combo.show()
+        self.dictio['entry1'].set_sensitive(1)
+        self.dictio['entry1'].set_text('Search..')
+
+        self.builder.get_object("label1").set_text(
+            "Here are the videos that matched your query :")
+
+        self.dictio["button3"].show()
+        self.dictio["button4"].show()
+        self.dictio["button3"].set_sensitive(0)
+        self.dictio["button4"].set_sensitive(0)
+        count = 0
+        print len(self.thumburis), 'glopy'
+        for e in self.thumburis[self.index:] :
             name = e[1]
             self.storemodel.append([name[:15], e[0], name])
             count += 1
-        self.dictio["iconview2"].set_columns(5)
 
     def _chooseMode(self):
         downloader = DownloaderUI(self.app)
@@ -215,20 +250,41 @@ class RemoteDownloader:
             downloader._createFileChooser(self.link, self)
 
     def _changeBlipPage(self):
-        self.combo.set_sensitive(0)
-        self.dictio['entry1'].set_sensitive(0)
-        self.dictio['entry1'].set_text('Searching...')
-        self.querier = WebArchiveIE()
-        self.blipquerier = BlipIE()
-        self.resultlist = []
-        for e in range(4):
-            self.result = self.blipquerier.search(self._userquery, e + 1 + self.page)
-            for element in self.result :
-                self.resultlist.append(element)
-        self.blipThread()
+        self.thumburis = []
+        self.search()
+
+    def changeVideo(self, ref):
+        if self.origin == 'blip':
+            info = self.resultlist[ref]
+            info = self.thumburis[ref][2]
+            if not info:
+                self.viewer.nextClip()
+                return
+            filename = self.blipquerier.getVideoUrl(info)
+            if filename != None:
+                self.template =''.join('http://blip.tv/file/get/' + filename + '?referrer=blip.tv&source=1&use_direct=1&use_documents=1')
+            else :
+                self.viewer.nextClip()
+                return
+            return self.template
+        if ref < len(self.thumburis):
+            feed = self.thumburis[ref][1]
+        else :
+            self.viewer.nextClip()
+            return
+        links = self.querier.getLinks(feed)
+        if links == None:
+            self.viewer.nextClip()
+            return
+        link = links[0][0]
+        self.template = "".join("http://www.archive.org" + link)
+        return self.template
 
     def _searchEntryCb(self, entry1):
+        self.page = 0
         self._userquery = entry1.get_text()
+        self.page = 0
+        self.combo.set_active(1)
         self.search()
 
     def _deleteTextCb(self, entry1, unused_event) :
@@ -236,13 +292,13 @@ class RemoteDownloader:
             entry1.set_text("")
 
     def _pageChangedCb (self, unused_combo):
-        if self.combo.get_active() != 0 and self.combo.get_active() != self.page:
-            self.page = self.combo.get_active()
+        if self.combo.get_active() != 0 and self.combo.get_active() - 1 != self.page:
+            self.page = self.combo.get_active() - 1
+            print self.combo.get_active(), 'bordel'
             if self.origin == 'blip':
                 self._changeBlipPage()
                 return
-            thread.start_new_thread(self.mainthread, (self._userquery,))
-
+            self.search()
     def _saveInProjectFolderCb(self, unused_radiobutton):
         if self.toggled == 0:
             self.toggled = 1
@@ -254,11 +310,14 @@ class RemoteDownloader:
         if self.origin == 'archive':
             feed = self.thumburis[self.preview_reference[0][0]][1]
             links = self.querier.getLinks(feed)
-
-            link = links[0][0]
+            if links == None:
+                self.dictio['label1'].set_text('Oops ! No links were found for your media.')
+                return
+            else :
+                link = links[0][0]
             self.template = "".join("http://www.archive.org" + link)
 
-        if self.origin == 'blip'and len(self.preview_reference):
+        if self.origin == 'blip' and len(self.preview_reference):
             info = self.thumburis[self.preview_reference[0][0]][2]
             filename = self.blipquerier.getVideoUrl(info)
             self.template =''.join('http://blip.tv/file/get/' + filename + '?referrer=blip.tv&source=1&use_direct=1&use_documents=1')
@@ -268,18 +327,7 @@ class RemoteDownloader:
             self.previewer = 1
 
     def _changeCb(self, ref):
-        if self.origin == 'blip':
-            info = self.resultlist[ref]
-            info = self.thumburis[ref][2]
-            filename = self.blipquerier.getVideoUrl(info)
-            self.template =''.join('http://blip.tv/file/get/' + filename + '?referrer=blip.tv&source=1&use_direct=1&use_documents=1')
-        return self.template
-
-        feed = self.thumburis[ref][1]
-        links = self.querier.getLinks(feed)
-        link = links[0][0]
-        self.template = "".join("http://www.archive.org" + link)
-        return self.template
+        self.changeVideo(ref)
 
     def _downloadSelectedCb(self, unused_button):
         if self.origin == 'blip':
@@ -292,7 +340,8 @@ class RemoteDownloader:
             feed = self.thumburis[self.preview_reference[0][0]][1]
             ref = self.preview_reference[0][0]
             links = self.querier.getLinks(feed)
-
+            if links == None :
+                return
             for link in links[0] :
                 self.combo2.append_text(link)
             self.combo2.set_active(0)
@@ -343,8 +392,7 @@ class RemoteDownloader:
 
         if self.previewer :
             self.viewer.window.destroy()
-        if self.downloading == 1:
-            self.app.gui.sourcelist.downloading -=1
+        self.app.gui.sourcelist.downloading -=1
         try :
             self.downloader.canc.cancel()
             if self.downloader.current != self.downloader.total :
@@ -438,6 +486,7 @@ class DownloaderUI:
         self.count += 1
 
     def _downloadFileCompleteCb(self, data):
+        self.instance.app.gui.sourcelist.downloading -=1
         if self.downloader.current == self.downloader.total :
             uri = "file://" + self.uri
             self.uri = uri[7:]

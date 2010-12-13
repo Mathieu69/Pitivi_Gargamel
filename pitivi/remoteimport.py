@@ -35,6 +35,8 @@ class BlipIE:
 
     def getVideoUrl(self, filename):
         feed = self.process("".join('http://blip.tv' + filename))
+        if feed is None:
+            return
         for element in feed:
             if 'Select a format' in element:
                 videoUrl = feed[element][0].split('?filename=')
@@ -48,6 +50,7 @@ class BlipIE:
     def search(self, query, page = 1):
         bigList = []
         template = "".join('http://blip.tv/search?q=' + query + '&page=' + str(page))
+        print template
         a = self.process(template)
         if a == None :
             return
@@ -79,7 +82,8 @@ class WebArchiveIE(Signallable):
         'info retrieved' : ['info'],
         }
 
-    def main(self, query, page):
+    def main(self, query, page = 1):
+        print page
         self.thumblist = []
         self.namelist = []
         self.feedlist = []
@@ -120,7 +124,7 @@ class WebArchiveIE(Signallable):
                 links.append(link)
             self.linklist.append(links)
         except :
-            pass
+            return None
         return self.linklist
 
     def _getThumbs(self, feed):
@@ -194,6 +198,7 @@ class WebArchiveIE(Signallable):
     def process(self, query, page = 1):
         template = "".join("http://www.archive.org/search.php?query=" +
              query +"%20AND%20mediatype%3Amovies&page=" + str(page))
+        print template
         request = Request(template, None, std_headers)
         try:
             video_info_webpage = urlopen(request).read()

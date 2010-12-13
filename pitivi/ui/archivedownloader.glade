@@ -20,7 +20,7 @@
     <property name="width_request">350</property>
     <property name="visible">True</property>
     <property name="border_width">10</property>
-    <property name="title" translatable="yes">Archive Importer</property>
+    <property name="title" translatable="yes">Remote Importer</property>
     <property name="resizable">False</property>
     <property name="window_position">center-always</property>
     <signal name="destroy" handler="_quitImporterCb"/>

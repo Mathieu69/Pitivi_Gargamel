@@ -42,7 +42,7 @@ class Preview:
         buttonbox.pack_end(self.button3)
 
         hbox.pack_start(buttonbox, False)
-        self.button.connect("clicked", self.start_stop)
+        self.button.connect("clicked", self._startStopCb)
         self.movie_window = gtk.DrawingArea()
         vbox.add(self.movie_window)
         self.vbox = vbox
@@ -58,7 +58,7 @@ class Preview:
         self.player.set_property("uri", self.uri)
         self.player.set_state(gst.STATE_PLAYING)
 
-    def start_stop(self, w):
+    def _startStopCb(self, w):
         if self.playing == 0:
             self.button.set_image(gtk.image_new_from_stock(gtk.STOCK_MEDIA_PAUSE, gtk.ICON_SIZE_BUTTON))
             self.player.set_state(gst.STATE_PLAYING)
@@ -72,7 +72,6 @@ class Preview:
         t = message.type
         if t == gst.MESSAGE_EOS:
             self.player.set_state(gst.STATE_NULL)
-            self.ref += 1
             self._nextClipCb('blip')
 
         elif t == gst.MESSAGE_ERROR:
@@ -89,36 +88,49 @@ class Preview:
             imagesink.set_property("force-aspect-ratio", True)
             imagesink.set_xwindow_id(self.xid)
 
+    def nextClip(self):
+        self.ref += 1
+        print self.ref
+        if self.ref < len(self.instance.thumburis):
+            self.player.set_state(gst.STATE_NULL)
+            if self.instance.changeVideo(self.ref) is not None:
+                self.player.set_property("uri", self.instance.changeVideo(self.ref))
+                self.player.set_state(gst.STATE_PLAYING)
+        else :
+            self.player.set_state(gst.STATE_NULL)
+            self.ref = 0
+            if self.instance.origin == 'archive':
+                self.instance.combo.set_active(self.instance.page + 2)
+            else :
+                self.instance.search()
+            self.previous = 0
+            gobject.timeout_add(15000, self._playAnew)
+
     def _quitCb(self, unused_button):
         self.player.set_state(gst.STATE_NULL)
         self.instance.previewer = 0
         self.window.destroy()
 
     def _nextClipCb(self, unused_button):
-        self.ref += 1
-        if self.ref < len(self.instance.thumburis):
-            self.player.set_state(gst.STATE_NULL)
-            self.player.set_property("uri", self.instance._changeCb(self.ref))
-            self.player.set_state(gst.STATE_PLAYING)
-        elif self.instance.origin == 'archive':
-            self.player.set_state(gst.STATE_NULL)
-            self.ref = 0
-            self.instance.combo.set_active(self.instance.page + 1)
-            gobject.timeout_add(15000, self._playAnew)
+        self.nextClip()
 
     def _previousClipCb(self, unused_button):
         if self.ref > 0 :
             self.ref -= 1
             self.player.set_state(gst.STATE_NULL)
             print self.ref, len(self.instance.thumburis)
-            self.player.set_property("uri", self.instance._changeCb(self.ref))
-            self.player.set_state(gst.STATE_PLAYING)
-        elif self.instance.page > 1  and self.instance.origin == 'archive':
+            if self.instance.changeVideo(self.ref) is not None:
+                self.player.set_property("uri", self.instance.changeVideo(self.ref))
+                self.player.set_state(gst.STATE_PLAYING)
+        elif self.instance.page > 0  and self.instance.origin == 'archive':
             self.player.set_state(gst.STATE_NULL)
-            self.instance.combo.set_active(self.instance.page - 1)
-            self.ref = len(self.instance.thumburis)-1
+            self.instance.combo.set_active(self.instance.page)
             gobject.timeout_add(15000, self._playAnew)
+            self.previous = 1
 
     def _playAnew(self):
-        self.player.set_property("uri", self.instance._changeCb(self.ref))
+        if self.previous == 1:
+            self.ref = len(self.instance.thumburis)-1
+            self.previous = 0
+        self.player.set_property("uri", self.instance.changeVideo(self.ref))
         self.player.set_state(gst.STATE_PLAYING)
