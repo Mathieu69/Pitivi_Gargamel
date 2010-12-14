@@ -28,6 +28,7 @@ import gobject
 import gst, bisect
 import os
 import struct
+import dbus
 from pitivi.signalinterface import Signallable
 import pitivi.log.log as log
 from gettext import ngettext

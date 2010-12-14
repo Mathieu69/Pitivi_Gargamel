@@ -41,7 +41,7 @@ from pitivi.settings import GlobalSettings
 from pitivi.utils import beautify_length, testConnection
 from pitivi.ui.common import beautify_factory, factory_name, \
     beautify_stream, PADDING
-from pitivi.ui.remoteimport import RemoteDownloader
+from pitivi.ui.remoteimport import RemoteDownloader, TermsAcceptance
 from pitivi.log.loggable import Loggable
 from pitivi.sourcelist import SourceListError
 
@@ -49,6 +49,9 @@ from urllib2 import urlopen, Request
 
 SHOW_TREEVIEW = 1
 SHOW_ICONVIEW = 2
+
+TERMS_NOT_ACCEPTED = 1
+TERMS_ACCEPTED = 2
 
 std_headers = {
     'User-Agent': 'Mozilla/5.0 (X11; U; Linux x86_64; en-US; rv:1.9.2.11) Gecko/20101019 Firefox/3.6.11',
@@ -72,6 +75,18 @@ GlobalSettings.addConfigOption('lastClipView',
     key='last-clip-view',
     type_=int,
     default=SHOW_ICONVIEW)
+
+GlobalSettings.addConfigSection('terms')
+GlobalSettings.addConfigOption('blipTerms',
+    section='terms',
+    key='accepted',
+    type_=int,
+    default=TERMS_NOT_ACCEPTED)
+GlobalSettings.addConfigOption('archiveTerms',
+    section='terms',
+    key='accepted',
+    type_=int,
+    default=TERMS_NOT_ACCEPTED)
 
 (COL_ICON,
  COL_ICON_LARGE,
@@ -457,13 +472,26 @@ class SourceList(gtk.VBox, Loggable):
         self.infobar.show()
 
     def showImportFromRemoteDialog(self):
-        print self.downloading, self.importerUp
-        if self.downloading < 3 and self.importerUp == 0 and testConnection:
+        if self.settings.archiveTerms == TERMS_ACCEPTED:
+            self.realShowImportFromRemoteDialog()
+
+        if self.settings.archiveTerms == TERMS_NOT_ACCEPTED :
+            accepter = TermsAcceptance(self.app, self, 'archive')
+
+    def realShowImportFromRemoteDialog(self):
+        if self.downloading < 3 and self.importerUp == 0 and testConnection():
             self.downloading += 1
             self.importerUp = 1
-            a = RemoteDownloader(self.app) 
-        else :
-            pass
+            a = RemoteDownloader(self.app, self) 
+        elif not testConnection() :
+            if 'pitivi.exe' in __file__.lower():
+                glade_dir = LIBDIR
+            else :
+                glade_dir = os.path.dirname(os.path.abspath(__file__))
+            self.errorbuilder = gtk.Builder()
+            gladefile = os.path.join(glade_dir, "connectionerror.glade")
+            self.errorbuilder.add_from_file(gladefile)
+            self.errorbuilder.connect_signals(self)
 
     def showImportSourcesDialog(self, select_folders=False):
         """Pop up the "Import Sources" dialog box"""

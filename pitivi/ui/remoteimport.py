@@ -2,16 +2,20 @@ import gtk, os, time
 from pitivi.utils import beautify_length
 from gst import SECOND
 from urllib2 import Request, urlopen, URLError
+import gobject
 
 from pitivi.sourcelist import SourceListError
+from pitivi.configure import get_terms_dir
 from pitivi.configure import get_pixmap_dir
 from random import randrange
 from urllib import urlretrieve, urlcleanup
 import thread
 from pitivi.remoteimport import MultiDownloader, WebArchiveIE, BlipIE
 from pitivi.ui.webpreviewer import Preview
-import gobject
+from pitivi.settings import GlobalSettings
 
+TERMS_NOT_ACCEPTED = 1
+TERMS_ACCEPTED = 2
 
 (COL_SHORT_TEXT,
  COL_ICON,
@@ -19,18 +23,69 @@ import gobject
 
 from pitivi.configure import LIBDIR
 
+class TermsAcceptance:
+    def __init__(self, app, instance, platform):
+        self.settings = app.settings
+        self.platform = platform
+        if platform == 'blip':
+            terms = '/blipterms'
+        else :
+            terms = '/archiveterms'
+        self.instance = instance
+        self._createUI(terms)
+
+    def _createUI(self, terms):
+        if 'pitivi.exe' in __file__.lower():
+            glade_dir = LIBDIR
+        else :
+            glade_dir = os.path.dirname(os.path.abspath(__file__))
+
+        # Open UI file
+        self.builder = gtk.Builder()
+        gladefile = os.path.join(glade_dir, "terms.glade")
+        self.builder.add_from_file(gladefile)
+        self.builder.connect_signals(self)
+        self.termsdir = get_terms_dir()
+        self._openTerms(terms)
+
+    def _openTerms(self, terms):
+        terms_file = "".join(self.termsdir + terms)
+        terms_text = open(terms_file, 'r')
+        terms_text = terms_text.read()
+        print terms_text
+        self._appendText(terms_text)
+
+    def _appendText(self, terms_text):
+        textbuffer = gtk.TextBuffer()
+        textbuffer.set_text(terms_text)
+        self.builder.get_object('textview1').set_buffer(textbuffer)
+
+    def _acceptedCb(self, unused_button):
+        self.builder.get_object('dialog1').destroy()
+        if self.platform == 'archive':
+            self.instance.realShowImportFromRemoteDialog()
+            self.settings.archiveTerms = TERMS_ACCEPTED
+        else :
+            self.settings.blipTerms = TERMS_ACCEPTED
+            self.instance.combo3.set_active(1)
+
+    def _rejectedCb(self, unused_button):
+        self.builder.get_object('dialog1').destroy()
+
+
 class RemoteDownloader:
 
-    def __init__(self, instance):
+    def __init__(self, app, instance):
         self.downloading = 0
-        self.app = instance
-        self._createUi()
+        self.previewer = 0
+        self.app = app
         self._packed = 0
         self.toggled = 1
-        self.pixdir = os.path.join(get_pixmap_dir(),"Remote/")
-        self.previewer = 0
         self.combo2 = 0
+        self.instance = instance
         self.lock = thread.allocate_lock()
+        self.settings = self.app.settings
+        self._createUi()
 
     def _createUi(self) :
         if 'pitivi.exe' in __file__.lower():
@@ -69,6 +124,8 @@ class RemoteDownloader:
         self.combo.hide()
         self.dictio["vbox1"].pack_end(self.dictio['hbuttonbox2']
             , expand = False, fill = False)
+        if self.settings.blipTerms == TERMS_NOT_ACCEPTED :
+            self.combo3.connect('changed', self._blipTermsCb)
 
     def search(self):
         """ Common search function for both platforms and pages"""
@@ -86,6 +143,10 @@ class RemoteDownloader:
         self.dictio["iconview2"].set_pixbuf_column(COL_ICON)
         self.dictio["iconview2"].set_tooltip_column (COL_TOOLTIP)
         self.dictio["iconview2"].set_model(self.storemodel)
+        self.throbber = gtk.Image()
+        self.throbber.set_from_file('image_path/Throbber.png')
+        hbox.pack_start(self.throbber, expand=False)
+
 
         if self._packed == 0:
             self.dictio["window1"].set_resizable(1)
@@ -115,7 +176,7 @@ class RemoteDownloader:
         self.thumburis = []
         self.origin = 'blip'
         self.blipquerier = BlipIE()
-        for e in range(4):
+        for e in range(15):
             pages = (self.page * 4 + e + 1)
             self.result = self.blipquerier.search(self._userquery, pages)
             for element in self.result :
@@ -299,6 +360,7 @@ class RemoteDownloader:
                 self._changeBlipPage()
                 return
             self.search()
+
     def _saveInProjectFolderCb(self, unused_radiobutton):
         if self.toggled == 0:
             self.toggled = 1
@@ -333,6 +395,7 @@ class RemoteDownloader:
         if self.origin == 'blip':
             self.format = 1
         if not self.format :
+            self.archiveLinkList = []
             self.dictio["button4"].set_label('Download')
             self.combo2 = gtk.combo_box_new_text()
             self.dictio['hbuttonbox2'].pack_end(self.combo2, expand = False)
@@ -343,12 +406,13 @@ class RemoteDownloader:
             if links == None :
                 return
             for link in links[0] :
-                self.combo2.append_text(link)
+                self.archiveLinkList.append(link)
+                self.combo2.append_text(link[len(link) - 15:])
             self.combo2.set_active(0)
             self.format = 1
             return
         if self.origin == 'archive':
-            self.link = "".join("http://www.archive.org" + self.combo2.get_active_text())
+            self.link = "".join("http://www.archive.org" + self.archiveLinkList[self.combo2.get_active()])
             self._chooseMode()
         if self.origin == 'blip' and len(self.preview_reference):
             self.link = self.resultlist[self.preview_reference[0][0]]
@@ -356,6 +420,11 @@ class RemoteDownloader:
             filename = self.blipquerier.getVideoUrl(self.link)
             self.link =''.join('http://blip.tv/file/get/' + filename + '?referrer=blip.tv&source=1&use_direct=1&use_documents=1')
             self._chooseMode()
+
+    def _blipTermsCb(self, unused_button):
+        if self.settings.blipTerms == TERMS_NOT_ACCEPTED and self.combo3.get_active() == 1:
+            self.combo3.set_active(0)
+            accepter = TermsAcceptance(self.app, self, 'blip')
 
     def _itemActivatedCb (self, data, data2):
         _reference = data2[0]
