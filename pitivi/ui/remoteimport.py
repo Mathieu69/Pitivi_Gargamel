@@ -27,6 +27,7 @@ class TermsAcceptance:
     def __init__(self, app, instance, platform):
         self.settings = app.settings
         self.platform = platform
+        self.app = app
         if platform == 'blip':
             terms = '/blipterms'
         else :
@@ -46,13 +47,13 @@ class TermsAcceptance:
         self.builder.add_from_file(gladefile)
         self.builder.connect_signals(self)
         self.termsdir = get_terms_dir()
+        self.builder.get_object('dialog1').set_transient_for(self.app.gui)
         self._openTerms(terms)
 
     def _openTerms(self, terms):
         terms_file = "".join(self.termsdir + terms)
         terms_text = open(terms_file, 'r')
         terms_text = terms_text.read()
-        print terms_text
         self._appendText(terms_text)
 
     def _appendText(self, terms_text):
@@ -76,6 +77,8 @@ class TermsAcceptance:
 class RemoteDownloader:
 
     def __init__(self, app, instance):
+        self.up = 1
+        self.refreshing = 0
         self.downloading = 0
         self.previewer = 0
         self.app = app
@@ -85,7 +88,11 @@ class RemoteDownloader:
         self.instance = instance
         self.lock = thread.allocate_lock()
         self.settings = self.app.settings
+        self.pixdir = "".join(get_pixmap_dir() + '/Remote/')
         self._createUi()
+        self.oldBlipLength = 0
+        self.tried = 0
+        self.forceRefresh = 0
 
     def _createUi(self) :
         if 'pitivi.exe' in __file__.lower():
@@ -103,50 +110,78 @@ class RemoteDownloader:
         self.dictio = {}
         for e in ["vbox1", "vbox2", "hbuttonbox1", "hbuttonbox2", "entry1",
          "label1", "scrolledwindow1","window1", "button1", "button2",
-         "iconview2", "button3", "button4", "spinbutton1", "hbox1"]:
+         "iconview2", "button3", "button4", "spinbutton1", "hbuttonbox3"]:
             self.dictio[e] = self.builder.get_object(e)
         self.dictio["entry1"].connect('button-press-event',
          self._deleteTextCb)
-        self.combo3 = gtk.combo_box_new_text()          #Repo chooser combobox
-        self.dictio['hbox1'].pack_end(self.combo3, expand = False, fill = False)
+        self.combo3 = gtk.combo_box_new_text()          #Platform chooser combobox
+        self.dictio['hbuttonbox3'].pack_start(self.combo3)
         self.combo3.show()
         self.combo3.append_text('Archive')
         self.combo3.append_text('Blip')
         self.combo3.set_active(0)
-        self.combo = gtk.combo_box_new_text()           #Page chooser combobox
-        self.dictio["hbuttonbox1"].pack_end(self.combo)
-        self.combo.show()
-        self.combo.append_text("Choose another page..")
-        for n in range(1,10):
-            self.combo.append_text("page %s" % (str(n)))
-        self.combo.set_active(1)
-        self.combo.connect("changed", self._pageChangedCb)
-        self.combo.hide()
+        self.dictio['window1'].set_transient_for(self.app.gui)
+
+        self.dictio['scrolledwindow1'].get_vscrollbar().connect('value-changed', self._scrolledCb)
+
+        colormap = self.dictio['iconview2'].get_colormap()
+        a = colormap.alloc_color(10000, 3211, 38421, writeable = True)
+        self.dictio['iconview2'].modify_fg(gtk.STATE_NORMAL, a)
+        self.throbber = gtk.Image()
+        self.throbber.set_from_file(''.join(self.pixdir + 'blue_spinner.gif'))
+        self.builder.get_object('hbuttonbox3').pack_start(self.throbber)
+        self.throbber.hide()
         self.dictio["vbox1"].pack_end(self.dictio['hbuttonbox2']
             , expand = False, fill = False)
         if self.settings.blipTerms == TERMS_NOT_ACCEPTED :
             self.combo3.connect('changed', self._blipTermsCb)
 
+    def _scrolledCb(self, vbar):
+        percentage = vbar.get_adjustment().get_value()/vbar.get_adjustment().get_upper()
+        if percentage > self.previous_percentage:
+            if percentage > 0.6 and self.refreshing == 0 and not self.stopReact:
+                self._refresh()
+        self.previous_percentage = percentage
+
+    def _refresh(self):
+        self.page += 1
+        self.refreshing = 1
+        self.search()
+
+    def _maybeRefresh(self):
+        if len(self.resultlist) - 1 != self.firstBlipLength:
+            if len(self.resultlist) < 50 or self.forceRefresh:
+                self.forceRefresh = 0
+                self._refresh()
+                print 'k'
+        else :
+            print "hm"
+            self.refreshing = 0
+            self.stopReact = 1
+            self.dictio['label1'].set_text('No more videos')
+            self._searchDone()
+
     def search(self):
         """ Common search function for both platforms and pages"""
-        self.combo.hide()
+        self.dictio["button3"].show()
+        self.dictio["button4"].show()
+        self.dictio["button3"].set_sensitive(0)
+        self.dictio["button4"].set_sensitive(0)
+        self.dictio["button4"].show()
         self.cnt = 0
         self.thumbcnt = 0
-        self.index = 0
+        if not self.refreshing :
+            self.index = 0
 
-        self.combo.set_sensitive(0)
-        self.dictio['button4'].hide()
-        self.dictio['button3'].hide()
-        self.storemodel = gtk.ListStore(str, gtk.gdk.Pixbuf, str)
+        self.combo3.hide()
+        self.throbber.show()
+        if not self.refreshing :
+            self.storemodel = gtk.ListStore(str, gtk.gdk.Pixbuf, str)
+            self.dictio["iconview2"].set_model(self.storemodel)
         self.dictio["iconview2"].set_orientation(gtk.ORIENTATION_VERTICAL)
         self.dictio["iconview2"].set_text_column(COL_SHORT_TEXT)
         self.dictio["iconview2"].set_pixbuf_column(COL_ICON)
         self.dictio["iconview2"].set_tooltip_column (COL_TOOLTIP)
-        self.dictio["iconview2"].set_model(self.storemodel)
-        self.throbber = gtk.Image()
-        self.throbber.set_from_file('image_path/Throbber.png')
-        hbox.pack_start(self.throbber, expand=False)
-
 
         if self._packed == 0:
             self.dictio["window1"].set_resizable(1)
@@ -161,41 +196,70 @@ class RemoteDownloader:
             self.combo2.destroy()                   #with the convenience function.
         self.dictio['entry1'].set_sensitive(0)
         self.dictio['entry1'].set_text('Searching...')
+        self.builder.get_object("label1").set_text(
+            "Here are the videos that matched your query :")
 
-        self.querier = WebArchiveIE()
-        self.resultlist = []
-        if self.combo3.get_active() == 0:
+        if not self.refreshing :
+            self.querier = WebArchiveIE()
+            self.resultlist = []
+        if self.combo3.get_active() == 0 and self.up:
             self.origin = 'archive'
-            thread.start_new_thread(self.mainthread, (self._userquery,))
+            thread.start_new_thread(self.archiveThread, (self._userquery,))
             return
-        elif self.combo3.get_active() == 1:
+        elif self.combo3.get_active() == 1 and self.up:
             thread.start_new_thread(self.blipThread, (None,))
 
 
     def blipThread(self, bogus):
-        self.thumburis = []
+        self.firstBlipLength = len(self.resultlist)
+        if not self.refreshing :
+            self.thumburis = []
+            self.blipquerier = BlipIE()
         self.origin = 'blip'
-        self.blipquerier = BlipIE()
-        for e in range(15):
-            pages = (self.page * 4 + e + 1)
-            self.result = self.blipquerier.search(self._userquery, pages)
+        self.result = self.blipquerier.search(self._userquery, self.page + 1)
+        self.oldBlipLength = len(self.resultlist) - 1
+        if self.result is not None :
             for element in self.result :
-                self.resultlist.append(element)
-
-        if not len(self.resultlist) or self.resultlist[0] == None:
-            self.dictio['entry1'].set_sensitive(1)
-            self.dictio['entry1'].set_text('Search..')
-            self.dictio['label1'].set_text('No video matched your query')
-            self.dictio['label1'].show()
+                try :
+                    self.resultlist.append(element)
+                except :
+                    self._maybeRefresh()
+                    return
+        else :
+            self._maybeRefresh()
             return
-        for result in self.resultlist:
-            thread.start_new_thread(self.thumbRetriever, (result,))
+        if len(self.resultlist) - 1 == self.oldBlipLength:
+            print 'bitch'
+            self.tried += 1
+            if self.tried == 10:
+                self.refreshing = 0
+                self.stopReact = 1
+                self.dictio['label1'].set_text('No more videos')
+                self.searchDone()
+                return
+            if len(self.resultlist) == 0:
+                self.dictio['label1'].set_text('No video matched your query')
+                self._searchDone()
+                return
+            self.dictio['label1'].show()
+            if self.tried < 10:
+                self.forceRefresh = 1
+                self._maybeRefresh()
+                return
+            self._searchDone()
+
+        if len(self.resultlist) - 1 > self.oldBlipLength:
+            self._maybeRefresh()
+        for result in self.resultlist[self.index:]:
+            if self.up:
+                thread.start_new_thread(self.thumbRetriever, (result,))
         gobject.timeout_add(50, self._update)
 
-    def mainthread(self, query):
-        self.thumburis = []
-        self.namelist = []
-        self.thumblist = []
+    def archiveThread(self, query):
+        if not self.refreshing:
+            self.thumburis = []
+            self.namelist = []
+            self.thumblist = []
         filled = 0
 
         if self.page:
@@ -207,9 +271,14 @@ class RemoteDownloader:
                 filled = 1
 
         if not filled :
+            if len(self.thumburis) == self.oldArchiveLength:
+                self.stopReact = 1
+                self.dictio['label1'].set_text('No more videos')
             self.dictio['entry1'].set_sensitive(1)
             self.dictio['entry1'].set_text('Search..')
-            self.dictio['label1'].set_text('No video matched your query')
+            if len(self.thumblist) == 0:
+                self.dictio['label1'].set_text('No video matched your query')
+            self._searchDone()
             self.dictio['label1'].show()
             return
 
@@ -220,16 +289,17 @@ class RemoteDownloader:
                     if e != None:
                         self.thumblist.append(e)
 
-        for element in self.thumblist:
+        for element in self.thumblist[self.index:]:
             e = element.split("/")[2]
             self.namelist.append(e)
         self.shown = 0
         count = 0
 
-        for element in self.thumblist:
+        for element in self.thumblist[self.index:]:
             template = "".join("http://www.archive.org" + element)
-            name = self.namelist[count]
-            thread.start_new_thread(self.thumbRetriever, ([name, name, template],))
+            name = self.namelist[count + self.index]
+            if self.up :
+                thread.start_new_thread(self.thumbRetriever, ([name, name, template],))
             count = count + 1
 
         self.progresscount = 0
@@ -238,21 +308,27 @@ class RemoteDownloader:
     def _update(self):
         self.lock.acquire()
         cnt = 0
+        if self.index == len(self.thumburis) and self.index > 0: #Start nothing new counter
+            self.nothingcnt += 1
+        else :
+            self.nothingcnt = 0
         for e in self.thumburis[self.index :]:
             cnt += 1
             name = e[1]
-            self.storemodel.append([name[:15], e[0], name])
+            try :
+                self.storemodel.append([name[:15], e[0], name])
+            except :
+                pass
         self.index = self.index + cnt
         self.lock.release()
         self.cnt += 1
-        if self.origin == 'archive' and len(self.thumburis) < 50 and self.cnt < 150:
-            gobject.timeout_add(50, self._update)
-        elif self.cnt < 100 :
-            gobject.timeout_add(50, self._update)
-        if self.origin == 'blip' and self.cnt == 100 or len(self.thumburis) == 30:
+        if self.origin == 'blip' and self.nothingcnt == 5: # 0.25 seconds
             self._searchDone()
-        if len(self.thumburis) == 50 or self.cnt == 150:
+            return
+        if self.nothingcnt == 50: # 2.5 seconds elapsed with nothing new
             self._searchDone()
+            return
+        gobject.timeout_add(50, self._update)
 
     def thumbRetriever(self, result):
         a = self.querier._retrieveThumb(result[2])
@@ -269,27 +345,29 @@ class RemoteDownloader:
         self.thumburis.append((thumb, result[1], result[0]))
 
     def _searchDone(self):
-        self.dictio['button4'].show()
-        self.dictio['button3'].show()
-        self.combo.set_sensitive(1)
-        if self.origin == 'blip':
-            self.builder.get_object('button4').set_label('Download')
-        self.combo.show()
-        self.dictio['entry1'].set_sensitive(1)
-        self.dictio['entry1'].set_text('Search..')
+        print 'right'
+        if len(self.resultlist) == 0:
+            self.refreshing = 0
+        if self.origin == 'archive':
+            self.oldArchiveLength = len(self.thumblist)
+            self.refreshing = 0
+        if len(self.resultlist) >= 40 and self.origin == 'blip':
+            self.refreshing = 0
+        if not self.refreshing :
+            self.combo3.show()
+            self.throbber.hide()
+            if self.origin == 'blip':
+                self.builder.get_object('button4').set_label('Download')
+            self.dictio['entry1'].set_sensitive(1)
+            self.dictio['entry1'].set_text('Search..')
 
-        self.builder.get_object("label1").set_text(
-            "Here are the videos that matched your query :")
-
-        self.dictio["button3"].show()
-        self.dictio["button4"].show()
-        self.dictio["button3"].set_sensitive(0)
-        self.dictio["button4"].set_sensitive(0)
         count = 0
-        print len(self.thumburis), 'glopy'
         for e in self.thumburis[self.index:] :
             name = e[1]
-            self.storemodel.append([name[:15], e[0], name])
+            try :
+                self.storemodel.append([name[:15], e[0], name])
+            except :
+                pass
             count += 1
 
     def _chooseMode(self):
@@ -309,6 +387,58 @@ class RemoteDownloader:
             self.dictio["window1"].destroy()
         else:
             downloader._createFileChooser(self.link, self)
+
+    def _preview(self):
+        ref = self.preview_reference[0][0]
+        if self.origin == 'archive':
+            feed = self.thumburis[self.preview_reference[0][0]][1]
+            links = self.querier.getLinks(feed)
+            if links == None:
+                self.dictio['label1'].set_text('Oops ! No links were found for your media.')
+                return
+            else :
+                link = links[0][0]
+            self.template = "".join("http://www.archive.org" + link)
+
+        if self.origin == 'blip' and len(self.preview_reference):
+            info = self.thumburis[self.preview_reference[0][0]][2]
+            filename = self.blipquerier.getVideoUrl(info)
+            self.template =''.join('http://blip.tv/file/get/' + filename + '?referrer=blip.tv&source=1&use_direct=1&use_documents=1')
+
+        if self.previewer == 0:
+            self.viewer = Preview(self.template, self, ref)
+            self.previewer = 1
+
+    def _downloadSelected(self):
+        if self.origin == 'blip':
+            self.format = 1
+        if not self.format :
+            feed = self.thumburis[self.preview_reference[0][0]][1]
+            ref = self.preview_reference[0][0]
+            links = self.querier.getLinks(feed)
+            if links == None :
+                self.format = 0
+                return
+            self.archiveLinkList = []
+            self.dictio["button4"].set_label('Download')
+            self.combo2 = gtk.combo_box_new_text()
+            self.dictio['hbuttonbox2'].pack_end(self.combo2, expand = False)
+            self.combo2.show()
+            for link in links[0] :
+                self.archiveLinkList.append(link)
+                self.combo2.append_text(link[len(link) - 15:])
+            self.combo2.set_active(0)
+            self.format = 1
+            return
+        if self.origin == 'archive':
+            self.link = "".join("http://www.archive.org" + self.archiveLinkList[self.combo2.get_active()])
+            self._chooseMode()
+        if self.origin == 'blip' and len(self.preview_reference):
+            self.link = self.resultlist[self.preview_reference[0][0]]
+            self.link = self.thumburis[self.preview_reference[0][0]][2]
+            filename = self.blipquerier.getVideoUrl(self.link)
+            self.link =''.join('http://blip.tv/file/get/' + filename + '?referrer=blip.tv&source=1&use_direct=1&use_documents=1')
+            self._chooseMode()
 
     def _changeBlipPage(self):
         self.thumburis = []
@@ -342,24 +472,19 @@ class RemoteDownloader:
         return self.template
 
     def _searchEntryCb(self, entry1):
+        self.tried = 0
+        self.oldArchiveLength = 0
+        self.oldBlipLength = 0
+        self.stopReact = 0
+        self.refreshing = 0
         self.page = 0
         self._userquery = entry1.get_text()
-        self.page = 0
-        self.combo.set_active(1)
+        self.previous_percentage = 0
         self.search()
 
     def _deleteTextCb(self, entry1, unused_event) :
         if entry1.get_text() == 'Search..':
             entry1.set_text("")
-
-    def _pageChangedCb (self, unused_combo):
-        if self.combo.get_active() != 0 and self.combo.get_active() - 1 != self.page:
-            self.page = self.combo.get_active() - 1
-            print self.combo.get_active(), 'bordel'
-            if self.origin == 'blip':
-                self._changeBlipPage()
-                return
-            self.search()
 
     def _saveInProjectFolderCb(self, unused_radiobutton):
         if self.toggled == 0:
@@ -368,58 +493,13 @@ class RemoteDownloader:
             self.toggled = 0
 
     def _previewCb(self, unused_button):
-        ref = self.preview_reference[0][0]
-        if self.origin == 'archive':
-            feed = self.thumburis[self.preview_reference[0][0]][1]
-            links = self.querier.getLinks(feed)
-            if links == None:
-                self.dictio['label1'].set_text('Oops ! No links were found for your media.')
-                return
-            else :
-                link = links[0][0]
-            self.template = "".join("http://www.archive.org" + link)
-
-        if self.origin == 'blip' and len(self.preview_reference):
-            info = self.thumburis[self.preview_reference[0][0]][2]
-            filename = self.blipquerier.getVideoUrl(info)
-            self.template =''.join('http://blip.tv/file/get/' + filename + '?referrer=blip.tv&source=1&use_direct=1&use_documents=1')
-
-        if self.previewer == 0:
-            self.viewer = Preview(self.template, self, ref)
-            self.previewer = 1
+        self._preview()
 
     def _changeCb(self, ref):
         self.changeVideo(ref)
 
     def _downloadSelectedCb(self, unused_button):
-        if self.origin == 'blip':
-            self.format = 1
-        if not self.format :
-            self.archiveLinkList = []
-            self.dictio["button4"].set_label('Download')
-            self.combo2 = gtk.combo_box_new_text()
-            self.dictio['hbuttonbox2'].pack_end(self.combo2, expand = False)
-            self.combo2.show()
-            feed = self.thumburis[self.preview_reference[0][0]][1]
-            ref = self.preview_reference[0][0]
-            links = self.querier.getLinks(feed)
-            if links == None :
-                return
-            for link in links[0] :
-                self.archiveLinkList.append(link)
-                self.combo2.append_text(link[len(link) - 15:])
-            self.combo2.set_active(0)
-            self.format = 1
-            return
-        if self.origin == 'archive':
-            self.link = "".join("http://www.archive.org" + self.archiveLinkList[self.combo2.get_active()])
-            self._chooseMode()
-        if self.origin == 'blip' and len(self.preview_reference):
-            self.link = self.resultlist[self.preview_reference[0][0]]
-            self.link = self.thumburis[self.preview_reference[0][0]][2]
-            filename = self.blipquerier.getVideoUrl(self.link)
-            self.link =''.join('http://blip.tv/file/get/' + filename + '?referrer=blip.tv&source=1&use_direct=1&use_documents=1')
-            self._chooseMode()
+        self._downloadSelected()
 
     def _blipTermsCb(self, unused_button):
         if self.settings.blipTerms == TERMS_NOT_ACCEPTED and self.combo3.get_active() == 1:
@@ -432,9 +512,8 @@ class RemoteDownloader:
     def _selectionChangedCb(self, iconview):
         self.format = 0
         self.preview_reference = iconview.get_selected_items()
-        if self.origin == 'archive':
+        if self.origin == 'archive' and not self.refreshing:
             self.dictio["button4"].set_label('Choose a format')
-
         if len(self.preview_reference):
             self.shown = 1
         else:
@@ -456,9 +535,10 @@ class RemoteDownloader:
     def _quitImporterCb(self, unused = None):
         """Decrement the download count and try to remove
         all current downloads before quitting"""
-        # Update the download counts and up reference
         self.app.gui.sourcelist.importerUp = 0
 
+        self.lock.acquire()
+        self.up = 0
         if self.previewer :
             self.viewer.window.destroy()
         self.app.gui.sourcelist.downloading -=1
@@ -469,6 +549,7 @@ class RemoteDownloader:
             self.dictio["window1"].destroy()
         except :
             self.dictio["window1"].destroy()
+        self.lock.release()
 
 class DownloaderUI:
     def __init__(self, app):
@@ -487,6 +568,8 @@ class DownloaderUI:
         gladefile = os.path.join(glade_dir, "downloader_ui.glade")
         self.builder.add_from_file(gladefile)
         self.builder.connect_signals(self)
+        self.builder.get_object('filechooserdialog1').set_transient_for(instance
+            .dictio['window1'])
 
     def download(self, url, uri):
         self.video_title = url.rsplit("/", 1)[1]

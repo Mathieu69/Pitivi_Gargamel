@@ -479,7 +479,7 @@ class SourceList(gtk.VBox, Loggable):
             accepter = TermsAcceptance(self.app, self, 'archive')
 
     def realShowImportFromRemoteDialog(self):
-        if self.downloading < 3 and self.importerUp == 0 and testConnection():
+        if self.downloading <3 and self.importerUp == 0 and testConnection():
             self.downloading += 1
             self.importerUp = 1
             a = RemoteDownloader(self.app, self) 
@@ -492,6 +492,9 @@ class SourceList(gtk.VBox, Loggable):
             gladefile = os.path.join(glade_dir, "connectionerror.glade")
             self.errorbuilder.add_from_file(gladefile)
             self.errorbuilder.connect_signals(self)
+
+    def _quitConnectionErrorCb(self, unused_button, unused = None):
+        self.errorbuilder.get_object("window1").destroy()
 
     def showImportSourcesDialog(self, select_folders=False):
         """Pop up the "Import Sources" dialog box"""

@@ -28,8 +28,11 @@ class BlipIE:
         request = Request(template, None, std_headers)
         try:
             video_info_webpage = urlopen(request).read()
-            video_info = parse_qs(video_info_webpage)
-            return video_info
+            if video_info_webpage is not None:
+                video_info = parse_qs(video_info_webpage)
+                return video_info
+            else:
+                return None
         except (URLError, HTTPException, error), err:
             return None
 
