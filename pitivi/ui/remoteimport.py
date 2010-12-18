@@ -77,6 +77,9 @@ class TermsAcceptance:
 class RemoteDownloader:
 
     def __init__(self, app, instance):
+        self.waiting = 0
+        self.reallyNothingCount = 0
+        self._previousquery = self.previous_origin = self.origin = ""
         self.up = 1
         self.refreshing = 0
         self.downloading = 0
@@ -93,6 +96,7 @@ class RemoteDownloader:
         self.oldBlipLength = 0
         self.tried = 0
         self.forceRefresh = 0
+        self.do = 1
 
     def _createUi(self) :
         if 'pitivi.exe' in __file__.lower():
@@ -136,12 +140,11 @@ class RemoteDownloader:
         if self.settings.blipTerms == TERMS_NOT_ACCEPTED :
             self.combo3.connect('changed', self._blipTermsCb)
 
+        self.dictio["window1"].set_resizable(1)
+        self.dictio["window1"].resize(1024, 768)
+
     def _scrolledCb(self, vbar):
-        percentage = vbar.get_adjustment().get_value()/vbar.get_adjustment().get_upper()
-        if percentage > self.previous_percentage:
-            if percentage > 0.6 and self.refreshing == 0 and not self.stopReact:
-                self._refresh()
-        self.previous_percentage = percentage
+        pass
 
     def _refresh(self):
         self.page += 1
@@ -149,20 +152,46 @@ class RemoteDownloader:
         self.search()
 
     def _maybeRefresh(self):
-        if len(self.resultlist) - 1 != self.firstBlipLength:
-            if len(self.resultlist) < 50 or self.forceRefresh:
-                self.forceRefresh = 0
-                self._refresh()
-                print 'k'
-        else :
-            print "hm"
+        self._refresh()
+
+    def _continuousSearchCb(self, button):
+
+        self._userquery = "+".join(self.dictio['entry1'].get_text().split())
+        blacklist = ['Search..', '', 'Searching...']
+        if self._userquery == 'Search..' or self._userquery == 'Searching...':
+            self._userquery = self._previousquery
+        print self._userquery, self._previousquery
+        if self._userquery not in blacklist and self._userquery != self._previousquery:
+            print "comment ca ?"
+            self.page = 0
             self.refreshing = 0
-            self.stopReact = 1
-            self.dictio['label1'].set_text('No more videos')
-            self._searchDone()
+        elif self._userquery == '':
+            self.dictio['label1'].set_text("I can't search for nothing !")
+            self.dictio['label1'].show()
+            button.set_active(False)
+            return
+        print self.combo3.get_active_text().lower(), self.previous_origin
+        if self._userquery == self._previousquery and self.previous_origin == self.combo3.get_active_text().lower():
+            self.page += 1
+            self.refreshing = 1
+        else :
+            self.page = 0
+            self.refreshing = 0
+        self._previousquery = self._userquery
+
+        if button.get_label() == 'Search':
+            button.set_label('Stop searching')
+            self.stopSearch = 0
+            self.search()
+        else :
+            self.stopSearch = 1
+            button.set_label('Search')
+            self.waiting = 1
+            button.set_sensitive(0)
 
     def search(self):
         """ Common search function for both platforms and pages"""
+        self.previous_origin = self.origin
         self.dictio["button3"].show()
         self.dictio["button4"].show()
         self.dictio["button3"].set_sensitive(0)
@@ -182,13 +211,12 @@ class RemoteDownloader:
         self.dictio["iconview2"].set_text_column(COL_SHORT_TEXT)
         self.dictio["iconview2"].set_pixbuf_column(COL_ICON)
         self.dictio["iconview2"].set_tooltip_column (COL_TOOLTIP)
+        self.builder.get_object("label1").show()
 
         if self._packed == 0:
-            self.dictio["window1"].set_resizable(1)
-            self.dictio["window1"].resize(1024, 768)
+            self.builder.get_object("image1").hide()
             _scrolledWindow = self.builder.get_object("scrolledwindow1")
             self.builder.get_object("vbox1").pack_start(_scrolledWindow)
-            self.builder.get_object("label1").show()
             self._packed = 1
             self.dictio["iconview2"].set_property("has_tooltip", True)
             self.dictio["iconview2"].set_columns(5)
@@ -197,7 +225,7 @@ class RemoteDownloader:
         self.dictio['entry1'].set_sensitive(0)
         self.dictio['entry1'].set_text('Searching...')
         self.builder.get_object("label1").set_text(
-            "Here are the videos that matched your query :")
+            "Trying to grab page %s for query %s ..." % (str(self.page + 1), self._userquery))
 
         if not self.refreshing :
             self.querier = WebArchiveIE()
@@ -220,36 +248,30 @@ class RemoteDownloader:
         self.oldBlipLength = len(self.resultlist) - 1
         if self.result is not None :
             for element in self.result :
-                try :
-                    self.resultlist.append(element)
-                except :
-                    self._maybeRefresh()
-                    return
+                self.resultlist.append(element)
         else :
             self._maybeRefresh()
             return
-        if len(self.resultlist) - 1 == self.oldBlipLength:
-            print 'bitch'
-            self.tried += 1
-            if self.tried == 10:
+
+        if len(self.resultlist) == 0:
+            self.reallyNothingCount += 1
+            print self.page, 'hng'
+            if self.reallyNothingCount == 5:
+                self.reallyNothingCount = 0
+                if self.page == 4:
+                    self.dictio['label1'].set_text('No videos')
+                else :
+                    self.dictio['label1'].set_text('No more videos')
+                self.builder.get_object('togglebutton1').set_active(False)
+                self.builder.get_object('togglebutton1').set_sensitive(0)
+                print self.page, 'shit'
                 self.refreshing = 0
-                self.stopReact = 1
-                self.dictio['label1'].set_text('No more videos')
-                self.searchDone()
-                return
-            if len(self.resultlist) == 0:
-                self.dictio['label1'].set_text('No video matched your query')
                 self._searchDone()
                 return
-            self.dictio['label1'].show()
-            if self.tried < 10:
-                self.forceRefresh = 1
-                self._maybeRefresh()
-                return
-            self._searchDone()
-
-        if len(self.resultlist) - 1 > self.oldBlipLength:
             self._maybeRefresh()
+            return
+        else:
+            self.reallyNothingCount = 0
         for result in self.resultlist[self.index:]:
             if self.up:
                 thread.start_new_thread(self.thumbRetriever, (result,))
@@ -271,16 +293,23 @@ class RemoteDownloader:
                 filled = 1
 
         if not filled :
-            if len(self.thumburis) == self.oldArchiveLength:
-                self.stopReact = 1
-                self.dictio['label1'].set_text('No more videos')
-            self.dictio['entry1'].set_sensitive(1)
-            self.dictio['entry1'].set_text('Search..')
-            if len(self.thumblist) == 0:
-                self.dictio['label1'].set_text('No video matched your query')
-            self._searchDone()
-            self.dictio['label1'].show()
-            return
+            self.reallyNothingCount += 1
+            print self.page, 'put'
+            if self.reallyNothingCount == 5:
+                if self.page == 4:
+                    self.dictio['label1'].set_text('No videos')
+                else :
+                    self.dictio['label1'].set_text('No more videos')
+                self.reallyNothingCount = 0
+                self.builder.get_object('togglebutton1').set_active(False)
+                self.builder.get_object('togglebutton1').set_sensitive(0)
+                self.stopSearch = 1
+
+            else :
+                self._maybeRefresh()
+                return
+        else :
+            self.reallyNothingCount = 0
 
         for element in feed:
             name = self.querier.specThumb(feed[element])
@@ -297,15 +326,17 @@ class RemoteDownloader:
 
         for element in self.thumblist[self.index:]:
             template = "".join("http://www.archive.org" + element)
-            name = self.namelist[count + self.index]
-            if self.up :
-                thread.start_new_thread(self.thumbRetriever, ([name, name, template],))
-            count = count + 1
+            if count + self.index < len (self.namelist):
+                name = self.namelist[count + self.index]
+                if self.up :
+                    thread.start_new_thread(self.thumbRetriever, ([name, name, template],))
+                count = count + 1
 
         self.progresscount = 0
         gobject.timeout_add(50, self._update)
 
     def _update(self):
+        print "hmk"
         self.lock.acquire()
         cnt = 0
         if self.index == len(self.thumburis) and self.index > 0: #Start nothing new counter
@@ -322,10 +353,25 @@ class RemoteDownloader:
         self.index = self.index + cnt
         self.lock.release()
         self.cnt += 1
+        if self.cnt == 200 and self.origin == 'blip':
+            self.stopSearch = 1
+            self.dictio['label1'].set_text('No more videos')
+            self.builder.get_object('togglebutton1').set_active(False)
+            self.builder.get_object('togglebutton1').set_sensitive(0)
+            self.do = 0
         if self.origin == 'blip' and self.nothingcnt == 5: # 0.25 seconds
+            self._maybeRefresh()
+            return
+        if self.nothingcnt == 50 and not self.stopSearch: # 2.5 seconds elapsed with nothing new
+            self._maybeRefresh()
+            return
+        elif self.stopSearch:
             self._searchDone()
             return
-        if self.nothingcnt == 50: # 2.5 seconds elapsed with nothing new
+        if self.nothingcnt == 50 :
+            self._maybeRefresh()
+            return
+        elif self.stopSearch:
             self._searchDone()
             return
         gobject.timeout_add(50, self._update)
@@ -335,40 +381,27 @@ class RemoteDownloader:
         try :
             thumb = gtk.gdk.pixbuf_new_from_file(a[0])
             if self.origin == 'blip':
-                thumb = thumb.scale_simple(160, 120, gtk.gdk.INTERP_BILINEAR)
+                thumb = thumb.scale_simple(140, 100, gtk.gdk.INTERP_BILINEAR)
         except :
             thumb = gtk.gdk.pixbuf_new_from_file(os.path.join(get_pixmap_dir()
         ,"error.png"))
-            if self.origin == 'blip':
-                thumb = thumb.scale_simple(160, 120, gtk.gdk.INTERP_BILINEAR)
+            thumb = thumb.scale_simple(160, 120, gtk.gdk.INTERP_BILINEAR)
         name = result[1]
+        print thumb
         self.thumburis.append((thumb, result[1], result[0]))
 
     def _searchDone(self):
-        print 'right'
-        if len(self.resultlist) == 0:
-            self.refreshing = 0
-        if self.origin == 'archive':
-            self.oldArchiveLength = len(self.thumblist)
-            self.refreshing = 0
-        if len(self.resultlist) >= 40 and self.origin == 'blip':
-            self.refreshing = 0
-        if not self.refreshing :
-            self.combo3.show()
-            self.throbber.hide()
-            if self.origin == 'blip':
-                self.builder.get_object('button4').set_label('Download')
-            self.dictio['entry1'].set_sensitive(1)
-            self.dictio['entry1'].set_text('Search..')
-
-        count = 0
-        for e in self.thumburis[self.index:] :
-            name = e[1]
-            try :
-                self.storemodel.append([name[:15], e[0], name])
-            except :
-                pass
-            count += 1
+        self.reallyNothingCount = 0
+        if self.waiting and self.do:
+            self.builder.get_object('togglebutton1').set_sensitive(1)
+            self.waiting = 0
+            self.do = 1
+        self.combo3.show()
+        self.throbber.hide()
+        if self.origin == 'blip':
+            self.builder.get_object('button4').set_label('Download')
+        self.dictio['entry1'].set_sensitive(1)
+        self.dictio['entry1'].set_text('Search..')
 
     def _chooseMode(self):
         downloader = DownloaderUI(self.app)
@@ -472,19 +505,12 @@ class RemoteDownloader:
         return self.template
 
     def _searchEntryCb(self, entry1):
-        self.tried = 0
-        self.oldArchiveLength = 0
-        self.oldBlipLength = 0
-        self.stopReact = 0
-        self.refreshing = 0
-        self.page = 0
-        self._userquery = entry1.get_text()
-        self.previous_percentage = 0
-        self.search()
+        self.builder.get_object('togglebutton1').set_active(True)
 
     def _deleteTextCb(self, entry1, unused_event) :
         if entry1.get_text() == 'Search..':
             entry1.set_text("")
+            self.builder.get_object('togglebutton1').set_sensitive(1)
 
     def _saveInProjectFolderCb(self, unused_radiobutton):
         if self.toggled == 0:

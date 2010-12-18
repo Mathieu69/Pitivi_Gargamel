@@ -59,6 +59,20 @@
                 <child>
                   <placeholder/>
                 </child>
+                <child>
+                  <object class="GtkToggleButton" id="togglebutton1">
+                    <property name="label" translatable="yes">Search</property>
+                    <property name="visible">True</property>
+                    <property name="can_focus">True</property>
+                    <property name="receives_default">True</property>
+                    <signal name="toggled" handler="_continuousSearchCb"/>
+                  </object>
+                  <packing>
+                    <property name="expand">False</property>
+                    <property name="fill">False</property>
+                    <property name="position">3</property>
+                  </packing>
+                </child>
               </object>
               <packing>
                 <property name="expand">False</property>
@@ -67,9 +81,7 @@
               </packing>
             </child>
             <child>
-              <object class="GtkLabel" id="label1">
-                <property name="label" translatable="yes">Here are the videos that matched your query :</property>
-              </object>
+              <object class="GtkLabel" id="label1"/>
               <packing>
                 <property name="expand">False</property>
                 <property name="fill">False</property>
@@ -77,7 +89,13 @@
               </packing>
             </child>
             <child>
-              <placeholder/>
+              <object class="GtkImage" id="image1">
+                <property name="visible">True</property>
+                <property name="pixbuf">prometheus.jpeg</property>
+              </object>
+              <packing>
+                <property name="position">2</property>
+              </packing>
             </child>
             <child>
               <placeholder/>
