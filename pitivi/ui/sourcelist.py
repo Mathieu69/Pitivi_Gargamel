@@ -479,8 +479,7 @@ class SourceList(gtk.VBox, Loggable):
             accepter = TermsAcceptance(self.app, self, 'archive')
 
     def realShowImportFromRemoteDialog(self):
-        if self.downloading <3 and self.importerUp == 0 and testConnection():
-            self.downloading += 1
+        if self.importerUp == 0 and testConnection():
             self.importerUp = 1
             a = RemoteDownloader(self.app, self) 
         elif not testConnection() :

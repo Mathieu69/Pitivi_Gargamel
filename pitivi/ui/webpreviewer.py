@@ -9,6 +9,7 @@ class Preview:
     def __init__(self, uri, instance, ref):
         window = gtk.Window(gtk.WINDOW_TOPLEVEL)
         window.set_default_size(800, 600)
+        window.set_icon_from_file("".join(instance.pixdir + 'prometheusflame.png'))
         self.playing = 1
 
         window.set_urgency_hint(True)

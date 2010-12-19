@@ -77,12 +77,12 @@ class TermsAcceptance:
 class RemoteDownloader:
 
     def __init__(self, app, instance):
+        self.downloading = 0
         self.waiting = 0
         self.reallyNothingCount = 0
         self._previousquery = self.previous_origin = self.origin = ""
         self.up = 1
         self.refreshing = 0
-        self.downloading = 0
         self.previewer = 0
         self.app = app
         self._packed = 0
@@ -93,7 +93,6 @@ class RemoteDownloader:
         self.settings = self.app.settings
         self.pixdir = "".join(get_pixmap_dir() + '/Remote/')
         self._createUi()
-        self.oldBlipLength = 0
         self.tried = 0
         self.forceRefresh = 0
         self.do = 1
@@ -126,11 +125,8 @@ class RemoteDownloader:
         self.combo3.set_active(0)
         self.dictio['window1'].set_transient_for(self.app.gui)
 
-        self.dictio['scrolledwindow1'].get_vscrollbar().connect('value-changed', self._scrolledCb)
-
-        colormap = self.dictio['iconview2'].get_colormap()
-        a = colormap.alloc_color(10000, 3211, 38421, writeable = True)
-        self.dictio['iconview2'].modify_fg(gtk.STATE_NORMAL, a)
+        self.dictio['iconview2'].set_column_spacing(0)
+        self.dictio['iconview2'].set_row_spacing(0)
         self.throbber = gtk.Image()
         self.throbber.set_from_file(''.join(self.pixdir + 'blue_spinner.gif'))
         self.builder.get_object('hbuttonbox3').pack_start(self.throbber)
@@ -142,9 +138,9 @@ class RemoteDownloader:
 
         self.dictio["window1"].set_resizable(1)
         self.dictio["window1"].resize(1024, 768)
+        self.dictio["window1"].set_icon_from_file("".join(self.pixdir + "prometheusflame.png"))
 
-    def _scrolledCb(self, vbar):
-        pass
+        self.builder.get_object('image1').set_from_file("".join(self.pixdir + "prometheus.jpeg"))
 
     def _refresh(self):
         self.page += 1
@@ -154,8 +150,7 @@ class RemoteDownloader:
     def _maybeRefresh(self):
         self._refresh()
 
-    def _continuousSearchCb(self, button):
-
+    def _continuousSearch(self, button):
         self._userquery = "+".join(self.dictio['entry1'].get_text().split())
         blacklist = ['Search..', '', 'Searching...']
         if self._userquery == 'Search..' or self._userquery == 'Searching...':
@@ -184,6 +179,8 @@ class RemoteDownloader:
             self.stopSearch = 0
             self.search()
         else :
+            self.page -= 1
+            self.dictio['label1'].set_text('Search..')
             self.stopSearch = 1
             button.set_label('Search')
             self.waiting = 1
@@ -194,33 +191,31 @@ class RemoteDownloader:
         self.previous_origin = self.origin
         self.dictio["button3"].show()
         self.dictio["button4"].show()
-        self.dictio["button3"].set_sensitive(0)
-        self.dictio["button4"].set_sensitive(0)
         self.dictio["button4"].show()
         self.cnt = 0
         self.thumbcnt = 0
+
         if not self.refreshing :
             self.index = 0
+            self.storemodel = gtk.ListStore(str, gtk.gdk.Pixbuf, str)
+            self.dictio["iconview2"].set_model(self.storemodel)
 
         self.combo3.hide()
         self.throbber.show()
-        if not self.refreshing :
-            self.storemodel = gtk.ListStore(str, gtk.gdk.Pixbuf, str)
-            self.dictio["iconview2"].set_model(self.storemodel)
         self.dictio["iconview2"].set_orientation(gtk.ORIENTATION_VERTICAL)
         self.dictio["iconview2"].set_text_column(COL_SHORT_TEXT)
         self.dictio["iconview2"].set_pixbuf_column(COL_ICON)
         self.dictio["iconview2"].set_tooltip_column (COL_TOOLTIP)
         self.builder.get_object("label1").show()
 
-        if self._packed == 0:
+        if not self._packed:
             self.builder.get_object("image1").hide()
             _scrolledWindow = self.builder.get_object("scrolledwindow1")
             self.builder.get_object("vbox1").pack_start(_scrolledWindow)
             self._packed = 1
             self.dictio["iconview2"].set_property("has_tooltip", True)
             self.dictio["iconview2"].set_columns(5)
-        if self.combo2:                             #FIXME : No easy way to clear a combobox created
+        if self.combo2 and not self.refreshing:     #FIXME : No easy way to clear a combobox created
             self.combo2.destroy()                   #with the convenience function.
         self.dictio['entry1'].set_sensitive(0)
         self.dictio['entry1'].set_text('Searching...')
@@ -239,13 +234,11 @@ class RemoteDownloader:
 
 
     def blipThread(self, bogus):
-        self.firstBlipLength = len(self.resultlist)
         if not self.refreshing :
             self.thumburis = []
             self.blipquerier = BlipIE()
         self.origin = 'blip'
         self.result = self.blipquerier.search(self._userquery, self.page + 1)
-        self.oldBlipLength = len(self.resultlist) - 1
         if self.result is not None :
             for element in self.result :
                 self.resultlist.append(element)
@@ -254,24 +247,9 @@ class RemoteDownloader:
             return
 
         if len(self.resultlist) == 0:
-            self.reallyNothingCount += 1
-            print self.page, 'hng'
-            if self.reallyNothingCount == 5:
-                self.reallyNothingCount = 0
-                if self.page == 4:
-                    self.dictio['label1'].set_text('No videos')
-                else :
-                    self.dictio['label1'].set_text('No more videos')
-                self.builder.get_object('togglebutton1').set_active(False)
-                self.builder.get_object('togglebutton1').set_sensitive(0)
-                print self.page, 'shit'
-                self.refreshing = 0
-                self._searchDone()
-                return
             self._maybeRefresh()
             return
-        else:
-            self.reallyNothingCount = 0
+
         for result in self.resultlist[self.index:]:
             if self.up:
                 thread.start_new_thread(self.thumbRetriever, (result,))
@@ -336,7 +314,6 @@ class RemoteDownloader:
         gobject.timeout_add(50, self._update)
 
     def _update(self):
-        print "hmk"
         self.lock.acquire()
         cnt = 0
         if self.index == len(self.thumburis) and self.index > 0: #Start nothing new counter
@@ -353,16 +330,29 @@ class RemoteDownloader:
         self.index = self.index + cnt
         self.lock.release()
         self.cnt += 1
+
         if self.cnt == 200 and self.origin == 'blip':
-            self.stopSearch = 1
-            self.dictio['label1'].set_text('No more videos')
-            self.builder.get_object('togglebutton1').set_active(False)
-            self.builder.get_object('togglebutton1').set_sensitive(0)
-            self.do = 0
+            self.reallyNothingCount += 1
+            print self.reallyNothingCount, 'chier'
+            if self.reallyNothingCount == 4:
+                if self.page == 4:
+                    self.dictio['label1'].set_text('No videos')
+                else :
+                    self.dictio['label1'].set_text('No more videos')
+                self.reallyNothingCount = 0
+                self.builder.get_object('togglebutton1').set_active(False)
+                self.builder.get_object('togglebutton1').set_sensitive(0)
+                self.stopSearch = 1
+
+            else :
+                self._maybeRefresh()
+                return
         if self.origin == 'blip' and self.nothingcnt == 5: # 0.25 seconds
+            self.reallyNothingCount = 0
             self._maybeRefresh()
             return
         if self.nothingcnt == 50 and not self.stopSearch: # 2.5 seconds elapsed with nothing new
+            self.reallyNothingCount = 0
             self._maybeRefresh()
             return
         elif self.stopSearch:
@@ -381,11 +371,11 @@ class RemoteDownloader:
         try :
             thumb = gtk.gdk.pixbuf_new_from_file(a[0])
             if self.origin == 'blip':
-                thumb = thumb.scale_simple(140, 100, gtk.gdk.INTERP_BILINEAR)
+                thumb = thumb.scale_simple(170, 140, gtk.gdk.INTERP_BILINEAR)
         except :
             thumb = gtk.gdk.pixbuf_new_from_file(os.path.join(get_pixmap_dir()
         ,"error.png"))
-            thumb = thumb.scale_simple(160, 120, gtk.gdk.INTERP_BILINEAR)
+            thumb = thumb.scale_simple(150, 125, gtk.gdk.INTERP_BILINEAR)
         name = result[1]
         print thumb
         self.thumburis.append((thumb, result[1], result[0]))
@@ -404,7 +394,8 @@ class RemoteDownloader:
         self.dictio['entry1'].set_text('Search..')
 
     def _chooseMode(self):
-        downloader = DownloaderUI(self.app)
+        downloader = DownloaderUI(self.app, self.builder.get_object('notebook1').
+            get_nth_page(1))
         if self.app.current.uri and self.toggled:
             dest = self.app.current.uri
             dest = dest.rsplit("/", 1)[0]
@@ -412,12 +403,9 @@ class RemoteDownloader:
  
             self.video_title = self.link.rsplit("/", 1)[1]
             dest = (dest + "/" + self.video_title)
-            self.app.gui.sourcelist.downloading +=1
-            self.app.gui.sourcelist.importerUp = 0
             self.preview = 0
             self.downloading = 1
-            downloader.download(self.link, dest)
-            self.dictio["window1"].destroy()
+            downloader.download(self.link, dest, self)
         else:
             downloader._createFileChooser(self.link, self)
 
@@ -427,7 +415,7 @@ class RemoteDownloader:
             feed = self.thumburis[self.preview_reference[0][0]][1]
             links = self.querier.getLinks(feed)
             if links == None:
-                self.dictio['label1'].set_text('Oops ! No links were found for your media.')
+                self.dictio['label1'].set_text('Oops! No links were found for your media.')
                 return
             else :
                 link = links[0][0]
@@ -470,6 +458,8 @@ class RemoteDownloader:
             self.link = self.resultlist[self.preview_reference[0][0]]
             self.link = self.thumburis[self.preview_reference[0][0]][2]
             filename = self.blipquerier.getVideoUrl(self.link)
+            if filename == None :
+                self.dictio['label1'].set_text('Oops! No links were found for your media.')
             self.link =''.join('http://blip.tv/file/get/' + filename + '?referrer=blip.tv&source=1&use_direct=1&use_documents=1')
             self._chooseMode()
 
@@ -503,6 +493,15 @@ class RemoteDownloader:
         link = links[0][0]
         self.template = "".join("http://www.archive.org" + link)
         return self.template
+
+    def _notePageChangedCb(self, notebook, unused_page, page_num):
+        if page_num == 1:
+            self.builder.get_object('image1').hide()
+        elif not self._packed:
+            self.builder.get_object('image1').show()
+
+    def _continuousSearchCb(self, button):
+        self._continuousSearch(button)
 
     def _searchEntryCb(self, entry1):
         self.builder.get_object('togglebutton1').set_active(True)
@@ -538,8 +537,10 @@ class RemoteDownloader:
     def _selectionChangedCb(self, iconview):
         self.format = 0
         self.preview_reference = iconview.get_selected_items()
-        if self.origin == 'archive' and not self.refreshing:
+        if self.origin == 'archive':
             self.dictio["button4"].set_label('Choose a format')
+        else:
+            self.dictio["button4"].set_label('Download')
         if len(self.preview_reference):
             self.shown = 1
         else:
@@ -551,7 +552,7 @@ class RemoteDownloader:
         elif self.shown == 0:
             self.dictio["button3"].set_sensitive(0)
             self.dictio["button4"].set_sensitive(0)
-        if self.combo2 :
+        if self.combo2:
             self.combo2.destroy()
 
     def _cancelButtonCb(self, unused_button):
@@ -578,8 +579,9 @@ class RemoteDownloader:
         self.lock.release()
 
 class DownloaderUI:
-    def __init__(self, app):
+    def __init__(self, app, container):
         self.app = app
+        self.container = container
 
     def _createFileChooser(self, link, instance):
         self.instance = instance
@@ -594,14 +596,21 @@ class DownloaderUI:
         gladefile = os.path.join(glade_dir, "downloader_ui.glade")
         self.builder.add_from_file(gladefile)
         self.builder.connect_signals(self)
+        self.builder.get_object("filechooserdialog1").set_icon_from_file("".join(instance.pixdir +
+            "prometheusflame.png"))
         self.builder.get_object('filechooserdialog1').set_transient_for(instance
             .dictio['window1'])
 
-    def download(self, url, uri):
+    def download(self, url, uri, instance = None):
+        self.instance.downloading += 1
+        v = self.instance.builder.get_object('vbox3')
+        self.instance.builder.get_object('notebook1').set_tab_label_text(v,
+            'Current downloads : %d' % float(self.instance.downloading))
         self.video_title = url.rsplit("/", 1)[1]
         self.url = url
         self.uri = uri
         self.downloader = MultiDownloader()
+        print url, uri
         self.downloader.download(url, uri)
         self.downloader.connect("finished", self._downloadFileCompleteCb)
         self.downloader.connect("progress", self._progressCb)
@@ -609,38 +618,37 @@ class DownloaderUI:
 
     def _createProgressBar(self):
         # Keep a time reference for the progress bar
+        self.video_title = self.video_title.split('?')[0]
+        self.video_title = self.video_title[len(self.video_title) - 30:]
         self.timestarted = time.time()
         self._progressBar = gtk.ProgressBar()
         self.previous_current = 0
         self.previous_timediff = 0
         self.count = 0
-        self._progressBar.set_size_request(220, -1)
-        self._cancelButton = gtk.Button('Cancel')
+        self._progressBar.set_size_request(600, -1)
+        self._cancelButton = gtk.Button('Cancel %s' % self.video_title)
         self._cancelButton.show()
         self._cancelButton.connect('clicked', self._cancelButtonCb)
-        self.vbox = gtk.VBox()
-        self.vbox.pack_end(self._progressBar, expand = False, fill = False)
-        self.vbox.pack_end(self._cancelButton)
-        # Pack the bar in the sourcelist. Should stay in this window if more
-        # than 3 simultaneous downloads are wanted.
-        self.app.gui.sourcelist.pack_end(self.vbox,
-        expand = False, fill = False)
-        self.vbox.show()
-        self.vbox.show_all()
+        self.hbox = gtk.HBox()
+        self.hbox.pack_start(self._progressBar, expand = False, fill = False)
+        self.hbox.pack_start(self._cancelButton, expand = False, fill = False)
+        self.container.pack_start(self.hbox, expand = False, fill = False)
+        self.hbox.set_spacing(6)
+        self.hbox.show()
+        self.hbox.show_all()
 
     def _quitFileChooserCb(self, unused_button):
         self.builder.get_object('filechooserdialog1').destroy()
 
     def _downloadFileCb(self, unused_button):
-        self.instance.app.gui.sourcelist.downloading +=1
-        self.instance.app.gui.sourcelist.importerUp = 0
-        self.instance.preview = 0
-        self.instance.downloading = 1
         dest = self.builder.get_object('filechooserdialog1').get_filename()
-        dest = (dest + "/" + self.video_title)
+        if self.video_title is not None :
+            dest = (dest + "/" + self.video_title)
+        else :
+            self.builder.get_object('filechooserdialog1').destroy()
+            return
         self.dest = dest
         self.builder.get_object('filechooserdialog1').destroy()
-        self.instance.dictio['window1'].destroy()
         self.download(self.link, dest)
 
     def _progressCb(self, data) :
@@ -653,18 +661,21 @@ class DownloaderUI:
         if timediff > 7.0 and self.count % 100 == 0:
             speed = (current-self.previous_current)/(timediff
             -self.previous_timediff)
-            remaining_time = (total-current) / speed
+            remaining_time = (total-current) * (timediff / current)
             text = beautify_length(int(remaining_time * SECOND))
-            self._progressBar.set_text("About %s left" % text)
+            self._progressBar.set_text("%s left at %d Kbps" % (text, speed / 1000))
 
-        if self.count == 400:
+        if self.count == 1000:
             self.previous_current = current
             self.previous_timediff = timediff
             self.count = 0
         self.count += 1
 
     def _downloadFileCompleteCb(self, data):
-        self.instance.app.gui.sourcelist.downloading -=1
+        self.instance.downloading -= 1
+        v = self.instance.builder.get_object('vbox3')
+        self.instance.builder.get_object('notebook1').set_tab_label_text(v,
+            'Current downloads : %d' % float(self.instance.downloading))
         if self.downloader.current == self.downloader.total :
             uri = "file://" + self.uri
             self.uri = uri[7:]
@@ -674,7 +685,7 @@ class DownloaderUI:
                 self.app.current.sources.addUris(uri)
             except SourceListError as error:
                 pass
-        self.vbox.destroy()
+        self.hbox.destroy()
 
     def _cancelButtonCb(self, unused_button):
         self.downloader.canc.cancel()
