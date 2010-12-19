@@ -3,6 +3,7 @@ from pitivi.utils import beautify_length
 from gst import SECOND
 from urllib2 import Request, urlopen, URLError
 import gobject
+from gettext import gettext as _
 
 from pitivi.sourcelist import SourceListError
 from pitivi.configure import get_terms_dir
@@ -153,7 +154,7 @@ class RemoteDownloader:
     def _continuousSearch(self, button):
         self._userquery = "+".join(self.dictio['entry1'].get_text().split())
         blacklist = ['Search..', '', 'Searching...']
-        if self._userquery == 'Search..' or self._userquery == 'Searching...':
+        if self._userquery == 'Search..' or self._userquery == _('Searching...'):
             self._userquery = self._previousquery
         print self._userquery, self._previousquery
         if self._userquery not in blacklist and self._userquery != self._previousquery:
@@ -161,7 +162,7 @@ class RemoteDownloader:
             self.page = 0
             self.refreshing = 0
         elif self._userquery == '':
-            self.dictio['label1'].set_text("I can't search for nothing !")
+            self.dictio['label1'].set_text(_("I can't search for nothing !"))
             self.dictio['label1'].show()
             button.set_active(False)
             return
@@ -218,9 +219,9 @@ class RemoteDownloader:
         if self.combo2 and not self.refreshing:     #FIXME : No easy way to clear a combobox created
             self.combo2.destroy()                   #with the convenience function.
         self.dictio['entry1'].set_sensitive(0)
-        self.dictio['entry1'].set_text('Searching...')
+        self.dictio['entry1'].set_text(_('Searching...'))
         self.builder.get_object("label1").set_text(
-            "Trying to grab page %s for query %s ..." % (str(self.page + 1), self._userquery))
+            _("Trying to grab page %i for query %s ...") % (self.page + 1, self._userquery))
 
         if not self.refreshing :
             self.querier = WebArchiveIE()
