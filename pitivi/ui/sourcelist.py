@@ -53,6 +53,9 @@ SHOW_ICONVIEW = 2
 TERMS_NOT_ACCEPTED = 1
 TERMS_ACCEPTED = 2
 
+ARCHIVE = 0
+BLIP = 1
+
 std_headers = {
     'User-Agent': 'Mozilla/5.0 (X11; U; Linux x86_64; en-US; rv:1.9.2.11) Gecko/20101019 Firefox/3.6.11',
     'Accept-Charset': 'ISO-8859-1,utf-8;q=0.7,*;q=0.7',
@@ -87,6 +90,13 @@ GlobalSettings.addConfigOption('archiveTerms',
     key='accepted',
     type_=int,
     default=TERMS_NOT_ACCEPTED)
+
+GlobalSettings.addConfigSection('remote-source')
+GlobalSettings.addConfigOption('source',
+    section = 'remote-source',
+    key = 'source',
+    type_ = int,
+    default = ARCHIVE)
 
 (COL_ICON,
  COL_ICON_LARGE,

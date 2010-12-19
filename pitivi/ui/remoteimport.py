@@ -15,8 +15,8 @@ from pitivi.remoteimport import MultiDownloader, WebArchiveIE, BlipIE
 from pitivi.ui.webpreviewer import Preview
 from pitivi.settings import GlobalSettings
 
-TERMS_NOT_ACCEPTED = 1
-TERMS_ACCEPTED = 2
+(TERMS_NOT_ACCEPTED,
+ TERMS_ACCEPTED) = range(2)
 
 (COL_SHORT_TEXT,
  COL_ICON,
@@ -129,7 +129,9 @@ class RemoteDownloader:
         self.dictio['iconview2'].set_column_spacing(0)
         self.dictio['iconview2'].set_row_spacing(0)
         self.throbber = gtk.Image()
-        self.throbber.set_from_file(''.join(self.pixdir + 'blue_spinner.gif'))
+        pixdir = get_pixmap_dir() + '/busy.gif'
+        print pixdir
+        self.throbber.set_from_file(pixdir)
         self.builder.get_object('hbuttonbox3').pack_start(self.throbber)
         self.throbber.hide()
         self.dictio["vbox1"].pack_end(self.dictio['hbuttonbox2']
@@ -142,6 +144,8 @@ class RemoteDownloader:
         self.dictio["window1"].set_icon_from_file("".join(self.pixdir + "prometheusflame.png"))
 
         self.builder.get_object('image1').set_from_file("".join(self.pixdir + "prometheus.jpeg"))
+
+        self.combo3.set_active(self.settings.source)
 
     def _refresh(self):
         self.page += 1
@@ -226,6 +230,7 @@ class RemoteDownloader:
         if not self.refreshing :
             self.querier = WebArchiveIE()
             self.resultlist = []
+        self.settings.source = self.combo3.get_active()
         if self.combo3.get_active() == 0 and self.up:
             self.origin = 'archive'
             thread.start_new_thread(self.archiveThread, (self._userquery,))
