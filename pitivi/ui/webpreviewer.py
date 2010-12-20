@@ -73,7 +73,7 @@ class Preview:
         t = message.type
         if t == gst.MESSAGE_EOS:
             self.player.set_state(gst.STATE_NULL)
-            self._nextClipCb('blip')
+            self._nextClip()
 
         elif t == gst.MESSAGE_ERROR:
             self.player.set_state(gst.STATE_NULL)
@@ -97,15 +97,6 @@ class Preview:
             if self.instance.changeVideo(self.ref) is not None:
                 self.player.set_property("uri", self.instance.changeVideo(self.ref))
                 self.player.set_state(gst.STATE_PLAYING)
-        else :
-            self.player.set_state(gst.STATE_NULL)
-            self.ref = 0
-            if self.instance.origin == 'archive':
-                self.instance.combo.set_active(self.instance.page + 2)
-            else :
-                self.instance.search()
-            self.previous = 0
-            gobject.timeout_add(15000, self._playAnew)
 
     def _quitCb(self, unused_button):
         self.player.set_state(gst.STATE_NULL)
@@ -123,11 +114,6 @@ class Preview:
             if self.instance.changeVideo(self.ref) is not None:
                 self.player.set_property("uri", self.instance.changeVideo(self.ref))
                 self.player.set_state(gst.STATE_PLAYING)
-        elif self.instance.page > 0  and self.instance.origin == 'archive':
-            self.player.set_state(gst.STATE_NULL)
-            self.instance.combo.set_active(self.instance.page)
-            gobject.timeout_add(15000, self._playAnew)
-            self.previous = 1
 
     def _playAnew(self):
         if self.previous == 1:

@@ -25,8 +25,8 @@
     <property name="border_width">10</property>
     <property name="title" translatable="yes">Remote Importer</property>
     <property name="resizable">False</property>
-    <property name="window_position">center-always</property>
-    <signal name="destroy" handler="_quitImporterCb"/>
+    <property name="window_position">center</property>
+    <signal name="delete_event" handler="_quitImporterCb"/>
     <child>
       <object class="GtkNotebook" id="notebook1">
         <property name="visible">True</property>
@@ -86,14 +86,6 @@
                       <packing>
                         <property name="expand">False</property>
                         <property name="fill">False</property>
-                        <property name="position">0</property>
-                      </packing>
-                    </child>
-                    <child>
-                      <object class="GtkLabel" id="label4"/>
-                      <packing>
-                        <property name="expand">False</property>
-                        <property name="fill">False</property>
                         <property name="position">1</property>
                       </packing>
                     </child>
@@ -107,6 +99,20 @@
                     </child>
                     <child>
                       <placeholder/>
+                    </child>
+                    <child>
+                      <object class="GtkLabel" id="label4">
+                        <property name="visible">True</property>
+                        <attributes>
+                          <attribute name="absolute-size" value="20000"/>
+                        </attributes>
+                      </object>
+                      <packing>
+                        <property name="expand">False</property>
+                        <property name="fill">False</property>
+                        <property name="pack_type">end</property>
+                        <property name="position">0</property>
+                      </packing>
                     </child>
                   </object>
                   <packing>
