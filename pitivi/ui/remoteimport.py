@@ -78,6 +78,7 @@ class TermsAcceptance:
 class RemoteDownloader:
 
     def __init__(self, app, instance):
+        self.viewer = 0
         self.downloading = 0
         self.searching = 0
         self.waiting = 0
@@ -96,6 +97,8 @@ class RemoteDownloader:
         self.pixdir = "".join(get_pixmap_dir() + '/Remote/')
         self._createUi()
         self.waitingthreads = 0
+        self.viewer = Preview(None , self, 0)
+        self.viewer.movie_window.window.set_background(gtk.gdk.Color(65535, 65535, 65535))
 
     def _createUi(self) :
         if 'pitivi.exe' in __file__.lower():
@@ -112,7 +115,7 @@ class RemoteDownloader:
         # Reference widgets and add a combobox to change page
         self.dictio = {}
         for e in ["vbox1", "vbox2", "hbuttonbox1", "hbuttonbox2", "entry1",
-         "label1", "scrolledwindow1","window1", "button1", "button2","label4",
+         "scrolledwindow1","window1", "button1", "button2","label4",
          "iconview2", "button3", "button4", "spinbutton1", "hbuttonbox3"]:
             self.dictio[e] = self.builder.get_object(e)
         self.dictio["entry1"].connect('button-press-event',
@@ -184,7 +187,7 @@ class RemoteDownloader:
             self.search()
         else :
             self.page -= 1
-            self.dictio['label1'].set_text('Search..')
+            self.dictio['label4'].set_text('Search..')
             self.stopSearch = 1
             button.set_label('Search')
             self.waiting = 1
@@ -211,7 +214,7 @@ class RemoteDownloader:
         self.dictio["iconview2"].set_text_column(COL_SHORT_TEXT)
         self.dictio["iconview2"].set_pixbuf_column(COL_ICON)
         self.dictio["iconview2"].set_tooltip_column (COL_TOOLTIP)
-        self.builder.get_object("label1").show()
+        self.builder.get_object("label4").show()
 
         if not self._packed:
             self.builder.get_object("image1").hide()
@@ -219,18 +222,19 @@ class RemoteDownloader:
             self.builder.get_object("vbox1").pack_start(_scrolledWindow)
             self._packed = 1
             self.dictio["iconview2"].set_property("has_tooltip", True)
-            self.dictio["iconview2"].set_columns(5)
+            self.dictio["iconview2"].set_columns(-1)
         if self.combo2 and not self.refreshing:     #FIXME : No easy way to clear a combobox created
             self.combo2.destroy()                   #with the convenience function.
         self.dictio['entry1'].set_sensitive(0)
         self.dictio['entry1'].set_text(_('Searching...'))
-        self.builder.get_object("label1").set_text(
+        self.builder.get_object("label4").set_text(
             _("Trying to grab page %i for query %s ...") % (self.page + 1, self._userquery))
 
         if not self.refreshing :
             self.querier = WebArchiveIE()
             self.resultlist = []
         self.settings.source = self.combo3.get_active()
+        print self.refreshing, 'jhbj'
         if self.combo3.get_active() == 0 and self.up:
             self.origin = 'archive'
             thread.start_new_thread(self.archiveThread, (self._userquery,))
@@ -283,9 +287,9 @@ class RemoteDownloader:
             print self.page, 'put'
             if self.reallyNothingCount == 5:
                 if self.page == 4:
-                    self.dictio['label1'].set_text('No videos')
+                    self.dictio['label4'].set_text('No videos')
                 else :
-                    self.dictio['label1'].set_text('No more videos')
+                    self.dictio['label4'].set_text('No more videos')
                 self.reallyNothingCount = 0
                 self.builder.get_object('togglebutton1').set_active(False)
                 self.builder.get_object('togglebutton1').set_sensitive(0)
@@ -310,6 +314,9 @@ class RemoteDownloader:
         self.shown = 0
         count = 0
 
+        if self.stopSearch:
+            self._searchDone()
+            return
         for element in self.thumblist[self.index:]:
             template = "".join("http://www.archive.org" + element)
             if count + self.index < len (self.namelist):
@@ -346,9 +353,9 @@ class RemoteDownloader:
             print self.reallyNothingCount, 'chier'
             if self.reallyNothingCount == 4:
                 if self.page == 4:
-                    self.dictio['label1'].set_text('No videos')
+                    self.dictio['label4'].set_text('No videos')
                 else :
-                    self.dictio['label1'].set_text('No more videos')
+                    self.dictio['label4pr'].set_text('No more videos')
                 self.reallyNothingCount = 0
                 self.builder.get_object('togglebutton1').set_active(False)
                 self.builder.get_object('togglebutton1').set_sensitive(0)
@@ -365,7 +372,7 @@ class RemoteDownloader:
             self.reallyNothingCount = 0
             self._maybeRefresh()
             return
-        elif self.stopSearch:
+        elif self.nothingcnt == 50 and self.stopSearch:
             self._searchDone()
             return
         if self.nothingcnt == 50:
@@ -387,7 +394,6 @@ class RemoteDownloader:
         ,"error.png"))
             thumb = thumb.scale_simple(150, 125, gtk.gdk.INTERP_BILINEAR)
         name = result[1]
-        print thumb
         self.thumburis.append((thumb, result[1], result[0]))
 
     def _searchDone(self):
@@ -434,11 +440,12 @@ class RemoteDownloader:
         if self.origin == 'blip' and len(self.preview_reference):
             info = self.thumburis[self.preview_reference[0][0]][2]
             filename = self.blipquerier.getVideoUrl(info)
+            if filename is None :
+                return
             self.template =''.join('http://blip.tv/file/get/' + filename + '?referrer=blip.tv&source=1&use_direct=1&use_documents=1')
-
-        if self.previewer == 0:
-            self.viewer = Preview(self.template, self, ref)
-            self.previewer = 1
+        if self.viewer:
+            self.viewer.quit()
+        self.viewer = Preview(self.template, self, ref)
 
     def _downloadSelected(self):
         if self.origin == 'blip':
@@ -472,7 +479,6 @@ class RemoteDownloader:
                 self.dictio['label4'].set_text('Oops! No links were found for your media.')
             self.link =''.join('http://blip.tv/file/get/' + filename + '?referrer=blip.tv&source=1&use_direct=1&use_documents=1')
             self._chooseMode()
-
     def changeVideo(self, ref):
         if self.origin == 'blip':
             info = self.resultlist[ref]
@@ -551,6 +557,10 @@ class RemoteDownloader:
     def _selectionChangedCb(self, iconview):
         self.format = 0
         self.preview_reference = iconview.get_selected_items()
+        if not self.viewer.playing :
+            self.viewer.movie_window.window.set_background(gtk.gdk.Color(65535, 65535, 65535))
+            pic = self.thumburis[self.preview_reference[0][0]][0].scale_simple(360, 230, gtk.gdk.INTERP_HYPER)
+            self.viewer.movie_window.window.draw_pixbuf(None, pic, 0, 0, 0, 0)
         if self.origin == 'archive':
             self.dictio["button4"].set_label('Choose a format')
         else:

@@ -7,38 +7,28 @@ import gobject
 class Preview:
 
     def __init__(self, uri, instance, ref):
-        window = gtk.Window(gtk.WINDOW_TOPLEVEL)
-        window.set_default_size(800, 600)
-        window.set_icon_from_file("".join(instance.pixdir + 'prometheusflame.png'))
-        self.playing = 1
-
-        window.set_urgency_hint(True)
-        self.window = window
-        window.set_title("Video-Player")
+        self.playing = 0
         self.uri = uri
         self.instance = instance
         self.ref = ref
-        window.connect("destroy", self._quitCb)
         vbox = gtk.VBox()
-        window.add(vbox)
+        instance.builder.get_object('alignment1').add(vbox)
         hbox = gtk.HBox()
 
         vbox.pack_end(hbox, False)
-        self.button = gtk.Button()
-        self.button.set_image(gtk.image_new_from_stock(gtk.STOCK_MEDIA_PAUSE, gtk.ICON_SIZE_BUTTON))
-        self.button2 = gtk.Button()
+        self.button = gtk.ToolButton(icon_widget = gtk.image_new_from_stock(gtk.STOCK_MEDIA_PAUSE, gtk.ICON_SIZE_BUTTON))
+        self.buttonalt = gtk.ToolButton(icon_widget = gtk.image_new_from_stock(gtk.STOCK_MEDIA_PLAY, gtk.ICON_SIZE_BUTTON))
+        self.button2 = gtk.ToolButton(gtk.image_new_from_stock(gtk.STOCK_CANCEL, gtk.ICON_SIZE_BUTTON))
         self.button2.connect("clicked", self._quitCb)
-        self.button2.set_image(gtk.image_new_from_stock(gtk.STOCK_CANCEL, gtk.ICON_SIZE_BUTTON))
-        self.button3 = gtk.Button()
-        self.button3.set_image(gtk.image_new_from_stock(gtk.STOCK_MEDIA_NEXT, gtk.ICON_SIZE_BUTTON))
+        self.button3 = gtk.ToolButton(gtk.image_new_from_stock(gtk.STOCK_MEDIA_NEXT, gtk.ICON_SIZE_BUTTON))
         self.button3.connect('clicked', self._nextClipCb)
-        self.button4 = gtk.Button()
-        self.button4.set_image(gtk.image_new_from_stock(gtk.STOCK_MEDIA_PREVIOUS, gtk.ICON_SIZE_BUTTON))
+        self.button4 = gtk.ToolButton(gtk.image_new_from_stock(gtk.STOCK_MEDIA_PREVIOUS, gtk.ICON_SIZE_BUTTON))
         self.button4.connect('clicked', self._previousClipCb)
 
         buttonbox = gtk.HButtonBox()
         buttonbox.pack_end(self.button2)
         buttonbox.pack_end(self.button)
+        buttonbox.pack_end(self.buttonalt)
         buttonbox.pack_end(self.button4)
         buttonbox.pack_end(self.button3)
 
@@ -47,7 +37,7 @@ class Preview:
         self.movie_window = gtk.DrawingArea()
         vbox.add(self.movie_window)
         self.vbox = vbox
-        window.show_all()
+        instance.builder.get_object('alignment1').show_all()
 
         self.player = gst.element_factory_make("playbin2", "player")
         self.xid = self.movie_window.window.xid
@@ -56,29 +46,35 @@ class Preview:
         bus.enable_sync_message_emission()
         bus.connect("message", self.on_message)
         bus.connect("sync-message::element", self.on_sync_message)
-        self.player.set_property("uri", self.uri)
-        self.player.set_state(gst.STATE_PLAYING)
+        self.id = self.button.get_icon_widget()
+        self.idalt = self.buttonalt.get_icon_widget()
+        if self.uri is not None :
+            self.player.set_property("uri", self.uri)
+            self.player.set_state(gst.STATE_PLAYING)
+            self.playing = 1
+        self.buttonalt.hide()
 
     def _startStopCb(self, w):
         if self.playing == 0:
-            self.button.set_image(gtk.image_new_from_stock(gtk.STOCK_MEDIA_PAUSE, gtk.ICON_SIZE_BUTTON))
+            self.button.stock_id = gtk.STOCK_MEDIA_PAUSE
             self.player.set_state(gst.STATE_PLAYING)
+            self.button.set_icon_widget(self.id)
             self.playing = 1
         else:
+            self.button.set_icon_widget(self.idalt)
             self.player.set_state(gst.STATE_PAUSED)
-            self.button.set_image(gtk.image_new_from_stock(gtk.STOCK_MEDIA_PLAY, gtk.ICON_SIZE_BUTTON))
             self.playing = 0
+        print self.id
 
     def on_message(self, bus, message):
         t = message.type
         if t == gst.MESSAGE_EOS:
             self.player.set_state(gst.STATE_NULL)
-            self._nextClip()
+            self.nextClip()
 
         elif t == gst.MESSAGE_ERROR:
             self.player.set_state(gst.STATE_NULL)
             err, debug = message.parse_error()
-            self.button.set_label("Start")
 
     def on_sync_message(self, bus, message):
         if message.structure is None:
@@ -98,10 +94,13 @@ class Preview:
                 self.player.set_property("uri", self.instance.changeVideo(self.ref))
                 self.player.set_state(gst.STATE_PLAYING)
 
-    def _quitCb(self, unused_button):
+    def quit(self):
         self.player.set_state(gst.STATE_NULL)
         self.instance.previewer = 0
-        self.window.destroy()
+        self.vbox.destroy()
+
+    def _quitCb(self, unused_button):
+        self.quit()
 
     def _nextClipCb(self, unused_button):
         self.nextClip()
