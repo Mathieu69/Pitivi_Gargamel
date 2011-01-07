@@ -78,6 +78,7 @@ class TermsAcceptance:
 class RemoteDownloader:
 
     def __init__(self, app, instance):
+        self.threadserial = 0
         self.viewer = 0
         self.downloading = 0
         self.searching = 0
@@ -97,7 +98,7 @@ class RemoteDownloader:
         self.pixdir = "".join(get_pixmap_dir() + '/Remote/')
         self._createUi()
         self.waitingthreads = 0
-        self.viewer = Preview(None , self, 0)
+        self.viewer = Preview(None , self, 0, app.gui)
         self.viewer.movie_window.window.set_background(gtk.gdk.Color(65535, 65535, 65535))
 
     def _createUi(self) :
@@ -155,7 +156,10 @@ class RemoteDownloader:
         self.search()
 
     def _maybeRefresh(self):
-        self._refresh()
+        if not self.stopSearch:
+            self._refresh()
+        else:
+            self._searchDone()
 
     def _continuousSearch(self, button):
         self._userquery = "+".join(self.dictio['entry1'].get_text().split())
@@ -249,21 +253,28 @@ class RemoteDownloader:
             self.blipquerier = BlipIE()
         self.origin = 'blip'
         self.result = self.blipquerier.search(self._userquery, self.page + 1)
+        print self.result
         if self.result is not None :
             for element in self.result :
                 self.resultlist.append(element)
-        else :
+        else:
             self._maybeRefresh()
             return
 
         if len(self.resultlist) == 0:
+            self.reallyNothingCount += 1
+            print self.reallyNothingCount, 'ok'
+            if self.reallyNothingCount == 4:
+                self.builder.get_object('togglebutton1').set_active(0)
             self._maybeRefresh()
             return
+        else :
+            self.reallyNothingCount = 0
 
         for result in self.resultlist[self.index:]:
             if self.up:
                 self.lock.acquire()
-                thread.start_new_thread(self.thumbRetriever, (result,))
+                thread.start_new_thread(self.thumbRetriever, (result, self.threadserial))
                 self.lock.release()
         gobject.timeout_add(50, self._update)
 
@@ -317,13 +328,14 @@ class RemoteDownloader:
         if self.stopSearch:
             self._searchDone()
             return
+        self.threadserial += 1
         for element in self.thumblist[self.index:]:
             template = "".join("http://www.archive.org" + element)
             if count + self.index < len (self.namelist):
                 name = self.namelist[count + self.index]
                 self.lock.acquire()
                 if self.up :
-                    thread.start_new_thread(self.thumbRetriever, ([name, name, template],))
+                    thread.start_new_thread(self.thumbRetriever, ([name, name, template], self.threadserial))
                 self.lock.release()
                 count = count + 1
 
@@ -355,7 +367,7 @@ class RemoteDownloader:
                 if self.page == 4:
                     self.dictio['label4'].set_text('No videos')
                 else :
-                    self.dictio['label4pr'].set_text('No more videos')
+                    self.dictio['label4'].set_text('No more videos')
                 self.reallyNothingCount = 0
                 self.builder.get_object('togglebutton1').set_active(False)
                 self.builder.get_object('togglebutton1').set_sensitive(0)
@@ -383,20 +395,26 @@ class RemoteDownloader:
             return
         gobject.timeout_add(50, self._update)
 
-    def thumbRetriever(self, result):
+    def thumbRetriever(self, result, serial):
         a = self.querier._retrieveThumb(result[2])
         try :
             thumb = gtk.gdk.pixbuf_new_from_file(a[0])
             if self.origin == 'blip':
-                thumb = thumb.scale_simple(170, 140, gtk.gdk.INTERP_BILINEAR)
+                thumb = thumb.scale_simple(159, 130, gtk.gdk.INTERP_BILINEAR)
         except :
             thumb = gtk.gdk.pixbuf_new_from_file(os.path.join(get_pixmap_dir()
         ,"error.png"))
-            thumb = thumb.scale_simple(150, 125, gtk.gdk.INTERP_BILINEAR)
+            thumb = thumb.scale_simple(159, 130, gtk.gdk.INTERP_BILINEAR)
         name = result[1]
-        self.thumburis.append((thumb, result[1], result[0]))
+        if serial == self.threadserial and self.origin == 'archive':
+            self.thumburis.append((thumb, result[1], result[0]))
+        elif serial == self.threadserial and self.origin == 'blip' and len(result) > 3:
+            self.thumburis.append((thumb, result[1], result[0], result[3]))
+        elif serial == self.threadserial and self.origin == 'blip':
+            self.thumburis.append((thumb, result[1], result[0], "Duration unavailable"))
 
     def _searchDone(self):
+        self.threadserial += 1
         self.searching = 0
         self.reallyNothingCount = 0
         if self.waiting:
@@ -445,7 +463,7 @@ class RemoteDownloader:
             self.template =''.join('http://blip.tv/file/get/' + filename + '?referrer=blip.tv&source=1&use_direct=1&use_documents=1')
         if self.viewer:
             self.viewer.quit()
-        self.viewer = Preview(self.template, self, ref)
+        self.viewer = Preview(self.template, self, ref, instance)
 
     def _downloadSelected(self):
         if self.origin == 'blip':
@@ -561,6 +579,9 @@ class RemoteDownloader:
             self.viewer.movie_window.window.set_background(gtk.gdk.Color(65535, 65535, 65535))
             pic = self.thumburis[self.preview_reference[0][0]][0].scale_simple(360, 230, gtk.gdk.INTERP_HYPER)
             self.viewer.movie_window.window.draw_pixbuf(None, pic, 0, 0, 0, 0)
+            if self.origin == 'blip':
+                duration = self.thumburis[self.preview_reference[0][0]][3]
+                self.builder.get_object('label1').set_text(duration)
         if self.origin == 'archive':
             self.dictio["button4"].set_label('Choose a format')
         else:
