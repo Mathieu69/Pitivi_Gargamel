@@ -4,73 +4,54 @@ import gst
 import gtk
 import thread
 import gobject
+from pitivi.ui.viewer import SimpleViewer
 class Preview:
 
-    def __init__(self, uri, instance, ref):
+    def __init__(self, uri, instance, ref, app):
+        self.undock_action = app.undock_action
+        self.viewer = SimpleViewer(app, undock_action=self.undock_action)
         self.playing = 0
         self.uri = uri
         self.instance = instance
         self.ref = ref
-        vbox = gtk.VBox()
-        instance.builder.get_object('alignment1').add(vbox)
-        hbox = gtk.HBox()
-
-        vbox.pack_end(hbox, False)
-        self.button = gtk.ToolButton(icon_widget = gtk.image_new_from_stock(gtk.STOCK_MEDIA_PAUSE, gtk.ICON_SIZE_BUTTON))
-        self.buttonalt = gtk.ToolButton(icon_widget = gtk.image_new_from_stock(gtk.STOCK_MEDIA_PLAY, gtk.ICON_SIZE_BUTTON))
-        self.button2 = gtk.ToolButton(gtk.image_new_from_stock(gtk.STOCK_CANCEL, gtk.ICON_SIZE_BUTTON))
-        self.button2.connect("clicked", self._quitCb)
-        self.button3 = gtk.ToolButton(gtk.image_new_from_stock(gtk.STOCK_MEDIA_NEXT, gtk.ICON_SIZE_BUTTON))
-        self.button3.connect('clicked', self._nextClipCb)
-        self.button4 = gtk.ToolButton(gtk.image_new_from_stock(gtk.STOCK_MEDIA_PREVIOUS, gtk.ICON_SIZE_BUTTON))
-        self.button4.connect('clicked', self._previousClipCb)
-
-        buttonbox = gtk.HButtonBox()
-        buttonbox.pack_end(self.button2)
-        buttonbox.pack_end(self.button)
-        buttonbox.pack_end(self.buttonalt)
-        buttonbox.pack_end(self.button4)
-        buttonbox.pack_end(self.button3)
-
-        hbox.pack_start(buttonbox, False)
-        self.button.connect("clicked", self._startStopCb)
-        self.movie_window = gtk.DrawingArea()
-        vbox.add(self.movie_window)
-        self.vbox = vbox
-        instance.builder.get_object('alignment1').show_all()
+        vbox = instance.builder.get_object('vbox3')
+        align = instance.builder.get_object('alignment1')
+        align.add(self.viewer)
+        align.show_all()
 
         self.player = gst.element_factory_make("playbin2", "player")
-        self.xid = self.movie_window.window.xid
         bus = self.player.get_bus()
         bus.add_signal_watch()
         bus.enable_sync_message_emission()
         bus.connect("message", self.on_message)
         bus.connect("sync-message::element", self.on_sync_message)
-        self.id = self.button.get_icon_widget()
-        self.idalt = self.buttonalt.get_icon_widget()
-        if self.uri is not None :
-            self.player.set_property("uri", self.uri)
-            self.player.set_state(gst.STATE_PLAYING)
-            self.playing = 1
-        self.buttonalt.hide()
+        self.viewer.external.do_realize()
+        self.xid = self.viewer.external.window.xid
+
+    def play(self, uri):
+        print uri
+        self.player.set_state(gst.STATE_NULL)
+        self.player.set_property("uri", uri)
+        self.playing = 1
+        self.viewer.setPipeline(self.player)
+        self.viewer.playing = True
+        self.viewer.playpause_button.setPause()
+        self.player.set_state(gst.STATE_PLAYING)
 
     def _startStopCb(self, w):
         if self.playing == 0:
-            self.button.stock_id = gtk.STOCK_MEDIA_PAUSE
+            self.button.set_stock_id('gtk-media-pause')
             self.player.set_state(gst.STATE_PLAYING)
-            self.button.set_icon_widget(self.id)
             self.playing = 1
         else:
-            self.button.set_icon_widget(self.idalt)
+            self.button.set_stock_id('gtk-media-play')
             self.player.set_state(gst.STATE_PAUSED)
             self.playing = 0
-        print self.id
 
     def on_message(self, bus, message):
         t = message.type
         if t == gst.MESSAGE_EOS:
             self.player.set_state(gst.STATE_NULL)
-            self.nextClip()
 
         elif t == gst.MESSAGE_ERROR:
             self.player.set_state(gst.STATE_NULL)
@@ -82,16 +63,25 @@ class Preview:
         message_name = message.structure.get_name()
         if message_name == "prepare-xwindow-id":
             imagesink = message.src
-            imagesink.set_property("force-aspect-ratio", True)
-            imagesink.set_xwindow_id(self.xid)
+            self.sink = imagesink
+            self._switch_output_window()
+
+    def _switch_output_window(self):
+        gtk.gdk.threads_enter()
+        self.sink.set_xwindow_id(self.viewer.target.window_xid)
+        self.sink.expose()
+        gtk.gdk.threads_leave()
 
     def nextClip(self):
         self.ref += 1
         print self.ref
+        print 'right'
         if self.ref < len(self.instance.thumburis):
             self.player.set_state(gst.STATE_NULL)
             if self.instance.changeVideo(self.ref) is not None:
+                print self.instance.changeVideo(self.ref)
                 self.player.set_property("uri", self.instance.changeVideo(self.ref))
+                self.button.set_image((gtk.image_new_from_stock('gtk-media-pause', gtk.ICON_SIZE_BUTTON)))
                 self.player.set_state(gst.STATE_PLAYING)
 
     def quit(self):
@@ -111,6 +101,7 @@ class Preview:
             self.player.set_state(gst.STATE_NULL)
             print self.ref, len(self.instance.thumburis)
             if self.instance.changeVideo(self.ref) is not None:
+                self.button.set_image((gtk.image_new_from_stock('gtk-media-pause', gtk.ICON_SIZE_BUTTON)))
                 self.player.set_property("uri", self.instance.changeVideo(self.ref))
                 self.player.set_state(gst.STATE_PLAYING)
 

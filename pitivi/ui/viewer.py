@@ -36,6 +36,7 @@ from pitivi.log.loggable import Loggable
 from pitivi.pipeline import PipelineError
 from pitivi.ui.common import SPACING
 from pitivi.settings import GlobalSettings
+from pitivi.configure import get_pixmap_dir
 
 GlobalSettings.addConfigSection("viewer")
 GlobalSettings.addConfigOption("viewerDocked",
@@ -64,8 +65,7 @@ class ViewerError(Exception):
 
 # TODO : Switch to using Pipeline and Action
 
-class PitiviViewer(gtk.VBox, Loggable):
-
+class BaseViewer(gtk.VBox, Loggable):
     __gtype_name__ = 'PitiviViewer'
     __gsignals__ = {
         "activate-playback-controls" : (gobject.SIGNAL_RUN_LAST, 
@@ -80,13 +80,13 @@ class PitiviViewer(gtk.VBox, Loggable):
     @cvar action: The action controlled by this Pipeline
     @type action: L{ViewAction}
     """
-
     def __init__(self, app, undock_action=None, action=None,
                  pipeline=None):
         """
         @param action: Specific action to use instead of auto-created one
         @type action: L{ViewAction}
         """
+        self.playing = False
         gtk.VBox.__init__(self)
         self.set_border_width(SPACING)
         self.app = app
@@ -95,8 +95,6 @@ class PitiviViewer(gtk.VBox, Loggable):
         Loggable.__init__(self)
         self.log("New PitiviViewer")
 
-        self.seeker = Seeker(80)
-        self.seeker.connect('seek', self._seekerSeekCb)
         self.action = action
         self.pipeline = pipeline
         self.sink = None
@@ -111,16 +109,152 @@ class PitiviViewer(gtk.VBox, Loggable):
 
         self._createUi()
         self.target = self.internal
-        self.setAction(action)
         self.setPipeline(pipeline)
         self.undock_action = undock_action
+        self._showingSlider = True
         if undock_action:
             self.undock_action.connect("activate", self._toggleDocked)
 
             if not self.settings.viewerDocked:
                 self.undock()
-
     def setPipeline(self, pipeline):
+        self.pipeline = pipeline
+    def _createUi(self):
+        """ Creates the Viewer GUI """
+        # drawing area
+        self.aframe = gtk.AspectFrame(xalign=0.5, yalign=0.5, ratio=4.0/3.0,
+                                      obey_child=False)
+        self.pack_start(self.aframe, expand = True)
+        self.internal = ViewerWidget(self.action)
+        self.internal.show()
+        self.aframe.add(self.internal)
+
+        self.external_window = gtk.Window()
+        vbox = gtk.VBox()
+        self.vbox = vbox
+        self.external_window.add(vbox)
+        self.external = ViewerWidget(self.action)
+        vbox.pack_start(self.external)
+        self.additionnal()
+        self.external_vbox = vbox
+        self.external_vbox.show_all()
+
+        # Buttons/Controls
+        bbox = gtk.HBox()
+        boxalign = gtk.Alignment(xalign=0.5, yalign=0.5)
+        boxalign.add(bbox)
+        self.boxalign = boxalign
+        self.bbox = bbox
+        self.pack_start(boxalign, expand=False)
+
+        self.goToStart_button = gtk.ToolButton(gtk.STOCK_MEDIA_PREVIOUS)
+        self.goToStart_button.connect("clicked", self._goToStartCb)
+        self.goToStart_button.set_tooltip_text(_("Go to the beginning of the timeline"))
+        self.goToStart_button.set_sensitive(False)
+        bbox.pack_start(self.goToStart_button, expand=False)
+
+        self.back_button = gtk.ToolButton(gtk.STOCK_MEDIA_REWIND)
+        self.back_button.connect("clicked", self._backCb)
+        self.back_button.set_tooltip_text(_("Go back one second"))
+        self.back_button.set_sensitive(False)
+        bbox.pack_start(self.back_button, expand=False)
+
+        self.playpause_button = PlayPauseButton()
+        self.playpause_button.connect("play", self._playButtonCb)
+        bbox.pack_start(self.playpause_button, expand=False)
+        self.playpause_button.set_sensitive(False)
+
+        self.forward_button = gtk.ToolButton(gtk.STOCK_MEDIA_FORWARD)
+        self.forward_button.connect("clicked", self._forwardCb)
+        self.forward_button.set_tooltip_text(_("Go forward one second"))
+        self.forward_button.set_sensitive(False)
+        bbox.pack_start(self.forward_button, expand=False)
+
+        self.goToEnd_button = gtk.ToolButton(gtk.STOCK_MEDIA_NEXT)
+        self.goToEnd_button.connect("clicked", self._goToEndCb)
+        self.goToEnd_button.set_tooltip_text(_("Go to the end of the timeline"))
+        self.goToEnd_button.set_sensitive(False)
+        bbox.pack_start(self.goToEnd_button, expand=False)
+
+        # current time
+        self.timelabel = gtk.Label()
+        self.timelabel.set_markup("<tt>00:00:00.000</tt>")
+        self.timelabel.set_alignment(1.0, 0.5)
+        bbox.pack_start(self.timelabel, expand=False, padding=10)
+        self._haveUI = True
+
+        screen = gdk.screen_get_default()
+        height = screen.get_height()
+        if height >= 800:
+            # show the controls and force the aspect frame to have at least the same
+            # width (+110, which is a magic number to minimize dead padding).
+            bbox.show_all()
+            width, height = bbox.size_request()
+            width += 110
+            height = int(width / self.aframe.props.ratio)
+            self.aframe.set_size_request(width , height)
+        self.show_all()
+        self.buttons = boxalign
+
+    def additionnal(self):
+        pass
+
+    def _goToStartCb(self):
+        pass
+    def _goToEndCb(self):
+        pass
+    def _backCb(self):
+        pass
+    def _forwardCb(self):
+        pass
+    def _playButtonCb(self, unused, unused2):
+        if self.playing:
+            self.playpause_button.setPlay()
+            self.pipeline.set_state(gst.STATE_PAUSED)
+            self.external.hide()
+            self.playing = False
+        elif self.pipeline != None:
+            self.playpause_button.setPause()
+            self.pipeline.set_state(gst.STATE_PLAYING)
+            self.playing = True
+    def _toggleDocked(self):
+        pass
+
+class SimpleViewer(BaseViewer):
+    def __init__(self, app, undock_action=None, action=None,
+                 pipeline=None):
+        BaseViewer.__init__(self, app, undock_action=None, action=None,
+                 pipeline=None)
+        self.reorder_child(self.boxalign,0)
+        self.playpause_button.set_sensitive(True)
+
+class PitiviViewer(BaseViewer):
+
+    def __init__(self, app, undock_action=None, action=None,
+                 pipeline=None):
+        BaseViewer.__init__(self, app, undock_action=None, action=None,
+                 pipeline=None)
+        self.seeker = Seeker(80)
+        self.seeker.connect('seek', self._seekerSeekCb)
+        self.setAction(action)
+
+    def additionnal(self):
+        self.external_window.connect("delete-event",
+            self._externalWindowDeleteCb)
+        self.external_window.connect("configure-event",
+            self._externalWindowConfigureCb)
+                # Slider
+        self.posadjust = gtk.Adjustment()
+        self.slider = gtk.HScale(self.posadjust)
+        self.slider.set_draw_value(False)
+        self.slider.connect("button-press-event", self._sliderButtonPressCb)
+        self.slider.connect("button-release-event", self._sliderButtonReleaseCb)
+        self.slider.connect("scroll-event", self._sliderScrollCb)
+        self.pack_start(self.slider, expand=False)
+        self.moving_slider = False
+        self.slider.set_sensitive(False)
+
+    def setPipeline(self, pipeline, use_position = True):
         """
         Set the Viewer to the given Pipeline.
 
@@ -143,7 +277,7 @@ class PitiviViewer(gtk.VBox, Loggable):
             self.pipeline = None
             self.currentState = gst.STATE_PAUSED
             self.playpause_button.setPause()
-        self._connectToPipeline(pipeline)
+        self._connectToPipeline(pipeline, use_position)
         self.pipeline = pipeline
         if self.pipeline is not None:
             self._setUiActive()
@@ -169,23 +303,24 @@ class PitiviViewer(gtk.VBox, Loggable):
         self._connectToAction(action)
         self.showControls()
 
-    def _connectToPipeline(self, pipeline):
+    def _connectToPipeline(self, pipeline, use_position):
         self.debug("pipeline:%r", pipeline)
         if self.pipeline != None:
             raise ViewerError("previous pipeline wasn't disconnected")
         self.pipeline = pipeline
         if self.pipeline == None:
             return
-        self.pipeline.connect('position', self._posCb)
-        self.pipeline.activatePositionListener()
-        self.pipeline.connect('state-changed', self._currentStateCb)
-        self.pipeline.connect('element-message', self._elementMessageCb)
-        self.pipeline.connect('duration-changed', self._durationChangedCb)
-        self.pipeline.connect('eos', self._eosCb)
+        if use_position:
+            self.pipeline.connect('position', self._posCb)
+            self.pipeline.activatePositionListener()
+            self.pipeline.connect('state-changed', self._currentStateCb)
+            self.pipeline.connect('element-message', self._elementMessageCb)
+            self.pipeline.connect('duration-changed', self._durationChangedCb)
+            self.pipeline.connect('eos', self._eosCb)
         # if we have an action set it to that new pipeline
-        if self.action:
-            self.pipeline.setAction(self.action)
-            self.action.activate()
+            if self.action:
+                self.pipeline.setAction(self.action)
+                self.action.activate()
 
     def _disconnectFromPipeline(self):
         self.debug("pipeline:%r", self.pipeline)
@@ -256,97 +391,6 @@ class PitiviViewer(gtk.VBox, Loggable):
         self.settings.viewerHeight = event.height
         self.settings.viewerX = event.x
         self.settings.viewerY = event.y
-
-    def _createUi(self):
-        """ Creates the Viewer GUI """
-        # drawing area
-        self.aframe = gtk.AspectFrame(xalign=0.5, yalign=0.5, ratio=4.0/3.0,
-                                      obey_child=False)
-        self.pack_start(self.aframe, expand=True)
-        self.internal = ViewerWidget(self.action)
-        self.internal.show()
-        self.aframe.add(self.internal)
-
-        self.external_window = gtk.Window()
-        vbox = gtk.VBox()
-        vbox.set_spacing(6)
-        self.external_window.add(vbox)
-        self.external = ViewerWidget(self.action)
-        vbox.pack_start(self.external)
-        self.external_window.connect("delete-event",
-            self._externalWindowDeleteCb)
-        self.external_window.connect("configure-event",
-            self._externalWindowConfigureCb)
-        self.external_vbox = vbox
-        self.external_vbox.show_all()
-
-        # Slider
-        self.posadjust = gtk.Adjustment()
-        self.slider = gtk.HScale(self.posadjust)
-        self.slider.set_draw_value(False)
-        self.slider.connect("button-press-event", self._sliderButtonPressCb)
-        self.slider.connect("button-release-event", self._sliderButtonReleaseCb)
-        self.slider.connect("scroll-event", self._sliderScrollCb)
-        self.pack_start(self.slider, expand=False)
-        self.moving_slider = False
-        self.slider.set_sensitive(False)
-
-        # Buttons/Controls
-        bbox = gtk.HBox()
-        boxalign = gtk.Alignment(xalign=0.5, yalign=0.5)
-        boxalign.add(bbox)
-        self.pack_start(boxalign, expand=False)
-
-        self.goToStart_button = gtk.ToolButton(gtk.STOCK_MEDIA_PREVIOUS)
-        self.goToStart_button.connect("clicked", self._goToStartCb)
-        self.goToStart_button.set_tooltip_text(_("Go to the beginning of the timeline"))
-        self.goToStart_button.set_sensitive(False)
-        bbox.pack_start(self.goToStart_button, expand=False)
-
-        self.back_button = gtk.ToolButton(gtk.STOCK_MEDIA_REWIND)
-        self.back_button.connect("clicked", self._backCb)
-        self.back_button.set_tooltip_text(_("Go back one second"))
-        self.back_button.set_sensitive(False)
-        bbox.pack_start(self.back_button, expand=False)
-
-        self.playpause_button = PlayPauseButton()
-        self.playpause_button.connect("play", self._playButtonCb)
-        bbox.pack_start(self.playpause_button, expand=False)
-        self.playpause_button.set_sensitive(False)
-
-        self.forward_button = gtk.ToolButton(gtk.STOCK_MEDIA_FORWARD)
-        self.forward_button.connect("clicked", self._forwardCb)
-        self.forward_button.set_tooltip_text(_("Go forward one second"))
-        self.forward_button.set_sensitive(False)
-        bbox.pack_start(self.forward_button, expand=False)
-
-        self.goToEnd_button = gtk.ToolButton(gtk.STOCK_MEDIA_NEXT)
-        self.goToEnd_button.connect("clicked", self._goToEndCb)
-        self.goToEnd_button.set_tooltip_text(_("Go to the end of the timeline"))
-        self.goToEnd_button.set_sensitive(False)
-        bbox.pack_start(self.goToEnd_button, expand=False)
-
-        # current time
-        self.timelabel = gtk.Label()
-        self.timelabel.set_markup("<tt>00:00:00.000</tt>")
-        self.timelabel.set_alignment(1.0, 0.5)
-        bbox.pack_start(self.timelabel, expand=False, padding=10)
-        self._haveUI = True
-
-        screen = gdk.screen_get_default()
-        height = screen.get_height()
-        if height >= 800:
-            # show the controls and force the aspect frame to have at least the same
-            # width (+110, which is a magic number to minimize dead padding).
-            bbox.show_all()
-            width, height = bbox.size_request()
-            width += 110
-            height = int(width / self.aframe.props.ratio)
-            self.aframe.set_size_request(width , height)
-        self.show_all()
-        self.buttons = boxalign
-
-    _showingSlider = True
 
     def showSlider(self):
         self._showingSlider = True

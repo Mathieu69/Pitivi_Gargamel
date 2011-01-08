@@ -99,7 +99,6 @@ class RemoteDownloader:
         self._createUi()
         self.waitingthreads = 0
         self.viewer = Preview(None , self, 0, app.gui)
-        self.viewer.movie_window.window.set_background(gtk.gdk.Color(65535, 65535, 65535))
 
     def _createUi(self) :
         if 'pitivi.exe' in __file__.lower():
@@ -461,9 +460,7 @@ class RemoteDownloader:
             if filename is None :
                 return
             self.template =''.join('http://blip.tv/file/get/' + filename + '?referrer=blip.tv&source=1&use_direct=1&use_documents=1')
-        if self.viewer:
-            self.viewer.quit()
-        self.viewer = Preview(self.template, self, ref, instance)
+        self.viewer.play(self.template)
 
     def _downloadSelected(self):
         if self.origin == 'blip':
@@ -576,9 +573,6 @@ class RemoteDownloader:
         self.format = 0
         self.preview_reference = iconview.get_selected_items()
         if not self.viewer.playing :
-            self.viewer.movie_window.window.set_background(gtk.gdk.Color(65535, 65535, 65535))
-            pic = self.thumburis[self.preview_reference[0][0]][0].scale_simple(360, 230, gtk.gdk.INTERP_HYPER)
-            self.viewer.movie_window.window.draw_pixbuf(None, pic, 0, 0, 0, 0)
             if self.origin == 'blip':
                 duration = self.thumburis[self.preview_reference[0][0]][3]
                 self.builder.get_object('label1').set_text(duration)
