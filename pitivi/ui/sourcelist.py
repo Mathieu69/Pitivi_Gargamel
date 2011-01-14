@@ -491,7 +491,7 @@ class SourceList(gtk.VBox, Loggable):
     def realShowImportFromRemoteDialog(self):
         if self.importerUp == 0 and testConnection():
             self.importerUp = 1
-            a = RemoteDownloader(self.app, self) 
+            self.downloader = RemoteDownloader(self.app, self) 
         elif not testConnection() :
             if 'pitivi.exe' in __file__.lower():
                 glade_dir = LIBDIR
