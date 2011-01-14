@@ -16,7 +16,9 @@ class Preview:
         self.ref = ref
         vbox = instance.builder.get_object('vbox3')
         align = instance.builder.get_object('alignment1')
-        align.add(self.viewer)
+        self.vbox = instance.builder.get_object('vbox3')
+        self.vbox.pack_start(self.viewer)
+        align.add(self.vbox)
         align.show_all()
 
         self.player = gst.element_factory_make("playbin2", "player")
@@ -35,8 +37,9 @@ class Preview:
         self.playing = 1
         self.viewer.setPipeline(self.player)
         self.viewer.playing = True
-        self.viewer.playpause_button.setPause()
         self.player.set_state(gst.STATE_PLAYING)
+        self.viewer.playpause_button.setPause()
+        self.instance.builder.get_object('label2').set_text("")
 
     def _startStopCb(self, w):
         if self.playing == 0:

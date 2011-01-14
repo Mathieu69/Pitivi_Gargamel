@@ -135,7 +135,6 @@ class BaseViewer(gtk.VBox, Loggable):
         self.external_window.add(vbox)
         self.external = ViewerWidget(self.action)
         vbox.pack_start(self.external)
-        self.additionnal()
         self.external_vbox = vbox
         self.external_vbox.show_all()
 
@@ -153,22 +152,10 @@ class BaseViewer(gtk.VBox, Loggable):
         self.goToStart_button.set_sensitive(False)
         bbox.pack_start(self.goToStart_button, expand=False)
 
-        self.back_button = gtk.ToolButton(gtk.STOCK_MEDIA_REWIND)
-        self.back_button.connect("clicked", self._backCb)
-        self.back_button.set_tooltip_text(_("Go back one second"))
-        self.back_button.set_sensitive(False)
-        bbox.pack_start(self.back_button, expand=False)
-
         self.playpause_button = PlayPauseButton()
         self.playpause_button.connect("play", self._playButtonCb)
         bbox.pack_start(self.playpause_button, expand=False)
         self.playpause_button.set_sensitive(False)
-
-        self.forward_button = gtk.ToolButton(gtk.STOCK_MEDIA_FORWARD)
-        self.forward_button.connect("clicked", self._forwardCb)
-        self.forward_button.set_tooltip_text(_("Go forward one second"))
-        self.forward_button.set_sensitive(False)
-        bbox.pack_start(self.forward_button, expand=False)
 
         self.goToEnd_button = gtk.ToolButton(gtk.STOCK_MEDIA_NEXT)
         self.goToEnd_button.connect("clicked", self._goToEndCb)
@@ -196,16 +183,9 @@ class BaseViewer(gtk.VBox, Loggable):
         self.show_all()
         self.buttons = boxalign
 
-    def additionnal(self):
-        pass
-
     def _goToStartCb(self):
         pass
     def _goToEndCb(self):
-        pass
-    def _backCb(self):
-        pass
-    def _forwardCb(self):
         pass
     def _playButtonCb(self, unused, unused2):
         if self.playing:
@@ -217,6 +197,8 @@ class BaseViewer(gtk.VBox, Loggable):
             self.playpause_button.setPause()
             self.pipeline.set_state(gst.STATE_PLAYING)
             self.playing = True
+        else:
+            self.app.sourcelist.downloader.preview()
     def _toggleDocked(self):
         pass
 
@@ -226,7 +208,12 @@ class SimpleViewer(BaseViewer):
         BaseViewer.__init__(self, app, undock_action=None, action=None,
                  pipeline=None)
         self.reorder_child(self.boxalign,0)
-        self.playpause_button.set_sensitive(True)
+        self.fullScreen_button = gtk.ToolButton(gtk.STOCK_FULLSCREEN)
+        self.fullScreen_button.connect("clicked", self._goToEndCb)
+        self.fullScreen_button.set_tooltip_text(_("Go to the end of the timeline"))
+        self.fullScreen_button.set_sensitive(False)
+        self.bbox.pack_start(self.fullScreen_button, expand=False)
+        self.set_border_width(5)
 
 class PitiviViewer(BaseViewer):
 
@@ -236,6 +223,7 @@ class PitiviViewer(BaseViewer):
                  pipeline=None)
         self.seeker = Seeker(80)
         self.seeker.connect('seek', self._seekerSeekCb)
+        self.additionnal()
         self.setAction(action)
 
     def additionnal(self):
@@ -253,6 +241,18 @@ class PitiviViewer(BaseViewer):
         self.pack_start(self.slider, expand=False)
         self.moving_slider = False
         self.slider.set_sensitive(False)
+
+        self.forward_button = gtk.ToolButton(gtk.STOCK_MEDIA_FORWARD)
+        self.forward_button.connect("clicked", self._forwardCb)
+        self.forward_button.set_tooltip_text(_("Go forward one second"))
+        self.forward_button.set_sensitive(False)
+        self.bbox.pack_start(self.forward_button, expand=False)
+
+        self.back_button = gtk.ToolButton(gtk.STOCK_MEDIA_REWIND)
+        self.back_button.connect("clicked", self._backCb)
+        self.back_button.set_tooltip_text(_("Go back one second"))
+        self.back_button.set_sensitive(False)
+        self.bbox.pack_start(self.back_button, expand=False)
 
     def setPipeline(self, pipeline, use_position = True):
         """
