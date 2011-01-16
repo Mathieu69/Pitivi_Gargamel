@@ -147,6 +147,7 @@ class RemoteDownloader:
         self.dictio["window1"].set_resizable(1)
         self.dictio["window1"].resize(900, 600)
         self.dictio["window1"].set_icon_from_file("".join(self.pixdir + "prometheusflame.png"))
+        print self.dictio['scrolledwindow1'].get_vscrollbar().connect('value-changed', self._scrolledCb)
 
         self.builder.get_object('image1').set_from_file("".join(self.pixdir + "banner.png"))
 
@@ -184,6 +185,7 @@ class RemoteDownloader:
             print "put"
             self.viewer.player.set_state(STATE_NULL)
             self.viewer.viewer.playpause_button.set_sensitive(False)
+            self.viewer.viewer.playpause_button.setPlay()
         self._previousquery = self._userquery
 
         if button.get_label() == 'Go !' or button.get_label() == 'More results':
@@ -242,21 +244,28 @@ class RemoteDownloader:
         if self.combo3.get_active() == 0 and self.up:
             self.origin = 'archive'
             thread.start_new_thread(self.archiveThread, (self._userquery,))
-            return
         elif self.combo3.get_active() == 1 and self.up:
             thread.start_new_thread(self.blipThread, (None,))
-        if len(self.thumburis) / self.coeff > 50:
-            self.builder.get_object('togglebutton1').set_active(0)
+        if not self.refreshing:
+            self.thumburis = []
+            self.namelist = []
+            self.thumblist = []
+        print len(self.thumburis), 'raaaaaah'
+        if len(self.thumburis) / self.coeff > 50 and self.origin == 'blip':
             self.coeff += 1
             self.refreshing = 0
-
+            self.builder.get_object('togglebutton1').set_active(0)
+        elif len(self.thumburis) / self.coeff > 101 and self.origin == 'archive':
+            self.page -= 1
+            self.coeff += 1
+            self.refreshing = 0
+            self.builder.get_object('togglebutton1').set_active(0)
     def preview(self):
         self.builder.get_object('label2').set_text("Loading video")
         thread.start_new_thread(self._preview, (None,))
 
     def blipThread(self, bogus):
         if not self.refreshing :
-            self.thumburis = []
             self.blipquerier = BlipIE()
         self.origin = 'blip'
         self.result = self.blipquerier.search(self._userquery, self.page + 1)
@@ -285,10 +294,7 @@ class RemoteDownloader:
         gobject.timeout_add(50, self._update)
 
     def archiveThread(self, query):
-        if not self.refreshing:
-            self.thumburis = []
-            self.namelist = []
-            self.thumblist = []
+        print 'weird'
         filled = 0
 
         if self.page:
@@ -335,9 +341,11 @@ class RemoteDownloader:
             self._searchDone()
             return
         self.threadserial += 1
+        print 'so weird'
         for element in self.thumblist[self.index:]:
             template = "".join("http://www.archive.org" + element)
             if count + self.index < len (self.namelist):
+                print 'ok'
                 name = self.namelist[count + self.index]
                 self.lock.acquire()
                 if self.up :
@@ -580,6 +588,7 @@ class RemoteDownloader:
         thread.start_new_thread(self._preview, (None,))
 
     def _selectionChangedCb(self, iconview):
+        print len(self.thumburis)
         self.format = 0
         self.preview_reference = iconview.get_selected_items()
         print self.preview_reference
@@ -626,7 +635,7 @@ class RemoteDownloader:
             pass
         #FIXME : This to make sure that threads called with start_new_thread come to a term
         if self.searching:
-            gobject.timeout_add(2000, self._destroy)
+            gobject.timeout_add(3000, self._destroy)
             self.dictio['statusbar1'].push(self.context, _('Terminating threads..'))
         else:
             self.dictio["window1"].destroy()
@@ -634,6 +643,11 @@ class RemoteDownloader:
 
     def _cancelButtonCb(self, unused_button):
         self._quit()
+
+    def _scrolledCb(self, vbar):
+        if not self.searching:
+            if vbar.get_adjustment().get_value()/vbar.get_adjustment().get_upper() > 0.7:
+                self.builder.get_object('togglebutton1').set_active(True)
 
     def _quitImporterCb(self, unused_data, unused_button):
         self._quit()

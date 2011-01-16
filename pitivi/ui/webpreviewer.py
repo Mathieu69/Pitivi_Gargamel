@@ -8,8 +8,7 @@ from pitivi.ui.viewer import SimpleViewer
 class Preview:
 
     def __init__(self, uri, instance, ref, app):
-        self.undock_action = app.undock_action
-        self.viewer = SimpleViewer(app, undock_action=self.undock_action)
+        self.viewer = SimpleViewer(app, undock_action=None)
         self.playing = 0
         self.uri = uri
         self.instance = instance
@@ -65,8 +64,7 @@ class Preview:
             return
         message_name = message.structure.get_name()
         if message_name == "prepare-xwindow-id":
-            imagesink = message.src
-            self.sink = imagesink
+            self.sink = message.src
             self._switch_output_window()
 
     def _switch_output_window(self):
@@ -76,7 +74,6 @@ class Preview:
         gtk.gdk.threads_leave()
 
     def nextClip(self):
-        self.ref += 1
         print self.ref
         print 'right'
         if self.ref < len(self.instance.thumburis):
@@ -84,7 +81,6 @@ class Preview:
             if self.instance.changeVideo(self.ref) is not None:
                 print self.instance.changeVideo(self.ref)
                 self.player.set_property("uri", self.instance.changeVideo(self.ref))
-                self.button.set_image((gtk.image_new_from_stock('gtk-media-pause', gtk.ICON_SIZE_BUTTON)))
                 self.player.set_state(gst.STATE_PLAYING)
 
     def quit(self):
