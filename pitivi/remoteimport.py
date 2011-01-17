@@ -6,8 +6,6 @@ from urllib import urlcleanup, urlretrieve, unquote
 import time
 import os
 import gio
-import gtk
-import threading
 import HTMLParser
 from pitivi.signalinterface import Signallable
 try:
@@ -181,7 +179,10 @@ class WebArchiveIE(Signallable):
 
 
     def _retrieveThumb(self, template):
-        a = urlretrieve(template)
+        try:
+            a = urlretrieve(template)
+        except IOError:
+            return None
         return a
 
     def _getSpecificVideo(self, feed):
@@ -264,11 +265,7 @@ class MultiDownloader(Signallable):
         self.current = float(current)
         self.total = float(total)
         self.emit('progress')
+
     def _downloadFileComplete(self, gdaemonfile, result):
         self.uri = "file://" + self.uri
         self.emit("finished")
-
-if __name__ == '__main__':
-    test = WebArchiveIE()
-    timestart = time.time()
-    url = test.main("blue")

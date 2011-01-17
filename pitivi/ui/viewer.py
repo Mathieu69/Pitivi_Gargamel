@@ -126,6 +126,7 @@ class BaseViewer(gtk.VBox, Loggable):
         self.aframe.add(self.internal)
 
         self.external_window = gtk.Window()
+        self.external_window.set_title('Pitivi')
         vbox = gtk.VBox()
         self.vbox = vbox
         self.external_window.add(vbox)
@@ -179,38 +180,12 @@ class BaseViewer(gtk.VBox, Loggable):
         self.show_all()
         self.buttons = boxalign
 
-    def undock(self):
-        if not self.undock_action:
-            self.error("Cannot undock because undock_action is missing.")
-            return
-        if not self.docked:
-            return
-
-        self.docked = False
-        self.settings.viewerDocked = False
-        self.undock_action.set_label(_("Dock Viewer"))
-
-        self.remove(self.buttons)
-        self.remove(self.slider)
-        self.external_vbox.pack_end(self.slider, False, False)
-        self.external_vbox.pack_end(self.buttons, False, False)
-        self.external_window.show()
-        self.target = self.external
-        # if we are playing, switch output immediately
-        if self.sink:
-            self._switch_output_window()
-        self.hide()
-        self.external_window.move(self.settings.viewerX,
-            self.settings.viewerY)
-        self.external_window.resize(self.settings.viewerWidth,
-            self.settings.viewerHeight)
-
-
-    def _goToStartCb(self):
-        pass
+    def _goToStartCb(self, unused_button):
+        self.app.sourcelist.downloader.viewer.previousClip()
 
     def _goToEndCb(self, unused_button):
         self.app.sourcelist.downloader.viewer.nextClip()
+
     def _playButtonCb(self, unused, unused2):
         if self.playing:
             self.playpause_button.setPlay()
@@ -232,38 +207,9 @@ class SimpleViewer(BaseViewer):
         BaseViewer.__init__(self, app, undock_action=undock_action, action=action,
                  pipeline=pipeline)
         self.reorder_child(self.boxalign,0)
-        self.fullScreen_button = gtk.ToolButton(gtk.STOCK_FULLSCREEN)
-        self.fullScreen_button.connect("clicked", self._fullScreenCb)
-        self.fullScreen_button.set_tooltip_text(_("Go fullscreen go !"))
-        #self.fullScreen_button.set_sensitive(False)
-        self.bbox.pack_start(self.fullScreen_button, expand=False)
-        self.goToEnd_button.set_sensitive(True)
         self.set_border_width(5)
         self.external.show()
-        
-    def _fullScreenCb(self, unused_button):
-        self.undock()
-
-    def undock(self):
-        #if not self.undock_action:
-         #   self.error("Cannot undock because undock_action is missing.")
-          #  return
-        if not self.docked:
-            return
-
-        self.docked = False
-
-        self.remove(self.buttons)
-        self.external_vbox.pack_end(self.buttons, False, False)
-        self.external_window.show()
-        self.target = self.external
-        # if we are playing, switch output immediately
-        self.external_window.move(self.settings.viewerX,
-            self.settings.viewerY)
-        self.external_window.resize(self.settings.viewerWidth,
-            self.settings.viewerHeight)
-        if self.app.sourcelist.downloader.viewer.sink:
-            self.app.sourcelist.downloader.viewer._switch_output_window()
+        self.bbox.remove(self.timelabel)
 
 class PitiviViewer(BaseViewer):
 
@@ -307,6 +253,9 @@ class PitiviViewer(BaseViewer):
         self.back_button.set_tooltip_text(_("Go back one second"))
         self.back_button.set_sensitive(False)
         self.bbox.pack_start(self.back_button, expand=False)
+
+        self.bbox.reorder_child(self.back_button, 1)
+        self.bbox.reorder_child(self.forward_button, 3)
 
     def setPipeline(self, pipeline, use_position = True):
         """
@@ -600,6 +549,33 @@ class PitiviViewer(BaseViewer):
             return
         self.pipeline.togglePlayback()
 
+    def undock(self):
+        if not self.undock_action:
+            self.error("Cannot undock because undock_action is missing.")
+            return
+        if not self.docked:
+            return
+
+        self.docked = False
+        self.settings.viewerDocked = False
+        self.undock_action.set_label(_("Dock Viewer"))
+
+        self.remove(self.buttons)
+        self.remove(self.slider)
+        self.external_vbox.pack_end(self.slider, False, False)
+        self.external_vbox.pack_end(self.buttons, False, False)
+        self.external_window.show()
+        self.target = self.external
+        # if we are playing, switch output immediately
+        if self.sink:
+            self._switch_output_window()
+        self.hide()
+        self.external_window.move(self.settings.viewerX,
+            self.settings.viewerY)
+        self.external_window.resize(self.settings.viewerWidth,
+            self.settings.viewerHeight)
+        self.hideSlider()
+
     def dock(self):
         if not self.undock_action:
             self.error("Cannot dock because undock_action is missing.")
@@ -620,6 +596,7 @@ class PitiviViewer(BaseViewer):
         if self.sink:
             self._switch_output_window()
         self.external_window.hide()
+        self.hideSlider()
 
     def _toggleDocked(self, action):
         if self.docked:

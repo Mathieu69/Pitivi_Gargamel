@@ -7,12 +7,12 @@ import gobject
 from pitivi.ui.viewer import SimpleViewer
 class Preview:
 
-    def __init__(self, uri, instance, ref, app):
+    def __init__(self, uri, instance, app):
         self.viewer = SimpleViewer(app, undock_action=None)
         self.playing = 0
         self.uri = uri
+        self.ref = 0
         self.instance = instance
-        self.ref = ref
         vbox = instance.builder.get_object('vbox3')
         align = instance.builder.get_object('alignment1')
         self.vbox = instance.builder.get_object('vbox3')
@@ -29,8 +29,8 @@ class Preview:
         self.viewer.external.do_realize()
         self.xid = self.viewer.external.window.xid
 
-    def play(self, uri):
-        print uri
+    def play(self, uri, ref):
+        self.ref = ref
         self.player.set_state(gst.STATE_NULL)
         self.player.set_property("uri", uri)
         self.playing = 1
@@ -74,39 +74,25 @@ class Preview:
         gtk.gdk.threads_leave()
 
     def nextClip(self):
-        print self.ref
-        print 'right'
-        if self.ref < len(self.instance.thumburis):
+        if self.ref < len(self.instance.thumburis) - 1 and self.viewer.playing:
+            self.ref += 1
             self.player.set_state(gst.STATE_NULL)
             if self.instance.changeVideo(self.ref) is not None:
-                print self.instance.changeVideo(self.ref)
-                self.player.set_property("uri", self.instance.changeVideo(self.ref))
-                self.player.set_state(gst.STATE_PLAYING)
+                thread.start_new_thread(self._change, (None,))
 
     def quit(self):
         self.player.set_state(gst.STATE_NULL)
         self.instance.previewer = 0
         self.vbox.destroy()
 
-    def _quitCb(self, unused_button):
-        self.quit()
-
-    def _nextClipCb(self, unused_button):
-        self.nextClip()
-
-    def _previousClipCb(self, unused_button):
-        if self.ref > 0 :
+    def previousClip(self):
+        if self.ref > 0 and self.viewer.playing:
             self.ref -= 1
             self.player.set_state(gst.STATE_NULL)
-            print self.ref, len(self.instance.thumburis)
             if self.instance.changeVideo(self.ref) is not None:
-                self.button.set_image((gtk.image_new_from_stock('gtk-media-pause', gtk.ICON_SIZE_BUTTON)))
-                self.player.set_property("uri", self.instance.changeVideo(self.ref))
-                self.player.set_state(gst.STATE_PLAYING)
+                thread.start_new_thread(self._change, (None,))
 
-    def _playAnew(self):
-        if self.previous == 1:
-            self.ref = len(self.instance.thumburis)-1
-            self.previous = 0
+    def _change(self, bogus):
+        self.instance._selectionChanged(self.ref)
         self.player.set_property("uri", self.instance.changeVideo(self.ref))
         self.player.set_state(gst.STATE_PLAYING)

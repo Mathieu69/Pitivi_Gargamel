@@ -187,7 +187,6 @@
           <object class="GtkIconView" id="iconview2">
             <property name="visible">True</property>
             <property name="can_focus">True</property>
-            <property name="border_width">10</property>
             <signal name="item_activated" handler="_itemActivatedCb"/>
             <signal name="selection_changed" handler="_selectionChangedCb"/>
           </object>
