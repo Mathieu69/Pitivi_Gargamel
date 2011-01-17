@@ -78,6 +78,7 @@ class TermsAcceptance:
 class RemoteDownloader:
 
     def __init__(self, app, instance):
+        self.kill = 0
         self.thumburis = []
         self._userquery = 0
         self.threadserial = 0
@@ -262,7 +263,6 @@ class RemoteDownloader:
             self.builder.get_object('togglebutton1').set_active(0)
 
     def preview(self):
-        self.builder.get_object('label2').set_text("Loading video")
         thread.start_new_thread(self._preview, (None,))
 
     def blipThread(self, bogus):
@@ -399,10 +399,7 @@ class RemoteDownloader:
             self.reallyNothingCount = 0
             self._maybeRefresh()
             return
-        elif self.nothingcnt == 50 and self.stopSearch:
-            self._searchDone()
-            return
-        if self.nothingcnt == 50:
+        if self.nothingcnt == 20:
             self._maybeRefresh()
             return
         elif self.stopSearch:
@@ -441,7 +438,8 @@ class RemoteDownloader:
             self.builder.get_object('togglebutton1').set_sensitive(1)
             self.waiting = 0
 
-        self.dictio['statusbar1'].push(self.context, '')
+        if not self.kill:
+            self.dictio['statusbar1'].push(self.context, '')
         self.combo3.show()
         self.throbber.hide()
 
@@ -449,7 +447,13 @@ class RemoteDownloader:
             self.builder.get_object('button4').set_label('Download')
 
         self.dictio['entry1'].set_sensitive(1)
-        self.builder.get_object('label6').show() 
+        self.builder.get_object('label6').show()
+        if self.kill == 1:
+            if self.origin == 'blip':
+                self._destroy()
+            else:
+                self.builder.get_object('window1').hide()
+                gobject.timeout_add(20000, self._destroy)
 
     def _chooseMode(self):
         downloader = DownloaderUI(self.app, self.app.gui.sourcelist)
@@ -464,10 +468,14 @@ class RemoteDownloader:
         else:
             downloader._createFileChooser(self.link, self)
 
-    def _preview(self, bogus = None):
-        ref = self.preview_reference[0][0]
+    def _preview(self, reference = None):
+        self.builder.get_object('label2').set_text("Loading video")
+        if reference:
+            ref = reference
+        else:
+            ref = self.preview_reference[0][0]
         if self.origin == 'archive':
-            feed = self.thumburis[self.preview_reference[0][0]][1]
+            feed = self.thumburis[ref][1]
             links = self.querier.getLinks(feed)
             if links == None:
                 self.dictio['statusbar1'].push(self.context, _('Oops! No links were found for your media.'))
@@ -477,12 +485,12 @@ class RemoteDownloader:
             self.template = "".join("http://www.archive.org" + link)
 
         if self.origin == 'blip' and len(self.preview_reference):
-            info = self.thumburis[self.preview_reference[0][0]][2]
+            info = self.thumburis[ref][2]
             filename = self.blipquerier.getVideoUrl(info)
             if filename is None :
                 return
             self.template =''.join('http://blip.tv/file/get/' + filename + '?referrer=blip.tv&source=1&use_direct=1&use_documents=1')
-        self.viewer.play(self.template, self.preview_reference[0][0])
+        self.viewer.play(self.template, ref)
 
     def _downloadSelected(self):
         if self.origin == 'blip':
@@ -633,8 +641,6 @@ class RemoteDownloader:
             accepter = TermsAcceptance(self.app, self, 'blip')
 
     def _itemActivatedCb (self, data, data2):
-        _reference = data2[0]
-        self.builder.get_object('label2').set_text("Loading video")
         thread.start_new_thread(self._preview, (None,))
 
     def _selectionChangedCb(self, unused_iconview):
@@ -657,8 +663,8 @@ class RemoteDownloader:
             pass
         #This to make sure that threads called with start_new_thread come to a term
         if self.searching:
-            gobject.timeout_add(3000, self._destroy)
-            self.dictio['statusbar1'].push(self.context, _('Terminating threads..'))
+            self.dictio['statusbar1'].push(self.context, _('Terminating threads ..'))
+            self.kill = 1
         else:
             self.dictio["window1"].destroy()
         self.lock.release()

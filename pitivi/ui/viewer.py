@@ -210,6 +210,13 @@ class SimpleViewer(BaseViewer):
         self.set_border_width(5)
         self.external.show()
         self.bbox.remove(self.timelabel)
+        self.checker = gtk.CheckButton(label = "Auto-play next clip")
+        self.bbox.add(self.checker)
+        self.checker.connect('toggled', self._autoPlayCb)
+        self.checker.show()
+
+    def _autoPlayCb(self, chkr):
+        self.app.sourcelist.downloader.viewer.checked = chkr.get_active()
 
 class PitiviViewer(BaseViewer):
 

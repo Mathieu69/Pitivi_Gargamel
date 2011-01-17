@@ -9,9 +9,9 @@ class Preview:
 
     def __init__(self, uri, instance, app):
         self.viewer = SimpleViewer(app, undock_action=None)
-        self.playing = 0
+        self.playing = self.ref = 0
+        self.checked = False
         self.uri = uri
-        self.ref = 0
         self.instance = instance
         vbox = instance.builder.get_object('vbox3')
         align = instance.builder.get_object('alignment1')
@@ -54,6 +54,8 @@ class Preview:
         t = message.type
         if t == gst.MESSAGE_EOS:
             self.player.set_state(gst.STATE_NULL)
+            if self.checked == True:
+                self.nextClip()
 
         elif t == gst.MESSAGE_ERROR:
             self.player.set_state(gst.STATE_NULL)
@@ -94,5 +96,6 @@ class Preview:
 
     def _change(self, bogus):
         self.instance._selectionChanged(self.ref)
-        self.player.set_property("uri", self.instance.changeVideo(self.ref))
-        self.player.set_state(gst.STATE_PLAYING)
+        thread.start_new_thread(self.instance._preview, (self.ref,))
+        #self.player.set_property("uri", self.instance.changeVideo(self.ref))
+        #self.player.set_state(gst.STATE_PLAYING)
