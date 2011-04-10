@@ -132,6 +132,18 @@ GlobalSettings.addConfigOption('effectVPanedPosition',
     section='effect-configuration',
     key='effect-vpaned-position',
     type_=int)
+GlobalSettings.addConfigSection("Authentification")
+GlobalSettings.addConfigOption('password',
+    section='Authentification',
+    key='pass',
+    type_=str,
+    default = None)
+GlobalSettings.addConfigOption('login',
+    section='Authentification',
+    key='log',
+    type_=str,
+    default = None)
+
 
 
 def supported(info):
