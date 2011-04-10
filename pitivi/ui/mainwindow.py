@@ -30,6 +30,19 @@ import gst
 from urllib import unquote
 import webbrowser
 
+try:
+    import gconf
+except:
+    HAVE_GCONF = False
+else:
+    HAVE_GCONF = True
+
+try:
+    import gdata.youtube.client
+    HAVE_GDATA_2 = True
+except:
+    HAVE_GDATA_2 = False
+
 from gettext import gettext as _
 from gtk import RecentManager
 
@@ -118,6 +131,18 @@ GlobalSettings.addConfigOption('effectVPanedPosition',
     section='effect-configuration',
     key='effect-vpaned-position',
     type_=int)
+GlobalSettings.addConfigSection("Authentification")
+GlobalSettings.addConfigOption('password',
+    section='Authentification',
+    key='pass',
+    type_=str,
+    default = None)
+GlobalSettings.addConfigOption('login',
+    section='Authentification',
+    key='log',
+    type_=str,
+    default = None)
+
 
 
 def supported(info):
@@ -236,20 +261,14 @@ class PitiviMainWindow(gtk.Window, Loggable):
         self.showEncodingDialog(self.project)
 
     def showPublishToYouTubeDialog(self, project, pause=True):
-        """
-        TODO: Document
-        """
+        #TODO: Document
+
         from publishtoyoutubedialog import PublishToYouTubeDialog
 
         if pause:
             project.pipeline.pause()
         win = PublishToYouTubeDialog(self, project)
-        win.window.connect("destroy", self._encodingDialogDestroyCb)
-        self.set_sensitive(False)
         win.show()
-
-    def _publishToYouTubeDialogDestroyCb(self, unused_dialog):
-        self.set_sensitive(True)
 
     def _publishCb(self, unused_button):
         self.showPublishToYouTubeDialog(self.project)
@@ -336,16 +355,8 @@ class PitiviMainWindow(gtk.Window, Loggable):
                 action.set_sensitive(False)
                 action.props.is_important = True
             elif action_name == "PublishToYouTube":
-                # TODO: this sensitivity should probably be the same as "RenderProject"'s sensitivity
-                action.set_sensitive(True)
-            elif action_name == "ImportfromCam":
-                self.webcam_button = action
+                self.publish_button = action
                 action.set_sensitive(False)
-            elif action_name == "Screencast":
-                # FIXME : re-enable this action once istanbul integration is complete
-                # and upstream istanbul has applied packages for proper interaction.
-                action.set_sensitive(False)
-                action.set_visible(False)
             elif action_name in [
                 "ProjectSettings", "Quit", "File", "Edit", "Help", "About",
                 "View", "FullScreen", "FullScreenAlternate", "UserManual",
@@ -724,6 +735,8 @@ class PitiviMainWindow(gtk.Window, Loggable):
         self._connectToProjectSources(project.sources)
         can_render = project.timeline.duration > 0
         self.render_button.set_sensitive(can_render)
+        if HAVE_GDATA_2:
+            self.publish_button.set_sensitive(can_render)
         self._syncDoUndo(self.app.action_log)
 
         if self._missingUriOnLoading:
@@ -1040,6 +1053,8 @@ class PitiviMainWindow(gtk.Window, Loggable):
         else:
             sensitive = False
         self.render_button.set_sensitive(sensitive)
+        if HAVE_GDATA_2:
+            self.publish_button.set_sensitive(sensitive)
 
 ## other
 
