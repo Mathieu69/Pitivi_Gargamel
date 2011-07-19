@@ -111,8 +111,6 @@ class PitiviViewer(gtk.VBox, Loggable):
         Loggable.__init__(self)
         self.log("New PitiviViewer")
 
-        self.seeker = Seeker(80)
-        self.seeker.connect('seek', self._seekerSeekCb)
         self.action = action
         self.pipeline = None
 
@@ -168,6 +166,8 @@ class PitiviViewer(gtk.VBox, Loggable):
             self.currentState = gst.STATE_PAUSED
         self._connectToPipeline()
         self._setUiActive()
+        self.seeker = self.app.projectManager.current.seeker
+        self.seeker.connect('seek', self._seekerSeekCb)
 
     def setAction(self, action):
         """
@@ -471,8 +471,10 @@ class PitiviViewer(gtk.VBox, Loggable):
 
     def _seekerSeekCb(self, seeker, position, format):
         try:
-            print "seeked"
-            self.pipeline.seek(position, format)
+            self.pipeline.seek(1.0, format, gst.SEEK_FLAG_FLUSH,
+                                  gst.SEEK_TYPE_SET, position,
+                                  gst.SEEK_TYPE_NONE, -1)
+            self.app.gui.timeline.timelinePositionChanged(position)
         except PipelineError:
             self.error("seek failed %s %s", gst.TIME_ARGS(position), format)
 
@@ -481,6 +483,8 @@ class PitiviViewer(gtk.VBox, Loggable):
         self.current_time = value
         self.current_frame = frame
         self.timecode_entry.setWidgetValue(value, False)
+        position = self.pipeline.query_position(gst.FORMAT_TIME)[0]
+        self.app.gui.timeline.timelinePositionChanged(position)
         if not self.moving_slider:
             self.posadjust.set_value(float(value))
         return False
@@ -526,9 +530,11 @@ class PitiviViewer(gtk.VBox, Loggable):
 
     def _playButtonCb(self, unused_button, playing):
         if playing:
+            self.playing = True
             self.pipeline.set_state(gst.STATE_PLAYING)
             gobject.timeout_add(300, self._posCb)
         else:
+            self.playing = False
             self.pipeline.set_state(gst.STATE_PAUSED)
 
     def _forwardCb(self, unused_button):
@@ -616,6 +622,10 @@ class PitiviViewer(gtk.VBox, Loggable):
 
     def seekRelative(self, time):
         try:
+            seekvalue = max(0, min(position + time,
+                self.getDuration()))
+            self.seek(seekvalue)
+            position = self.pipeline.query_position(gst.FORMAT_TIME)[0]
             self.pipeline.seekRelative(time)
         except:
             self.warning("seek failed")
@@ -624,6 +634,8 @@ class PitiviViewer(gtk.VBox, Loggable):
         position = self.pipeline.query_position(gst.FORMAT_TIME)[0]
         self._newTime(position)
         self.app.gui.timeline._canvas.timelinePositionChanged(position)
+        if not self.playing :
+            return False
         return True
 
     def _currentStateCb(self, state):
