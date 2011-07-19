@@ -240,12 +240,13 @@ class TrackObject(View, goocanvas.Group, Zoomable):
                 self._view.app.current.seeker.seek(Zoomable.pixelToNs(x))
                 timeline.setSelectionToObj(element, SELECT)
 
-    def __init__(self, instance, element, track, timeline, is_transition = False):
+    def __init__(self, instance, element, track, timeline, uTrack, is_transition = False):
         goocanvas.Group.__init__(self)
         View.__init__(self)
         Zoomable.__init__(self)
         self.app = instance
         self.track = track
+        self.uTrack = uTrack
         self.timeline = timeline
         self.namewidth = 0
         self.nameheight = 0
@@ -285,18 +286,16 @@ class TrackObject(View, goocanvas.Group, Zoomable):
             for thing in (self.bg, self.selection_indicator,
                 self.namebg, self.name):
                 self.add_child(thing)
-            self.connect("focus-in-event", self._enterCb)
+
+        self.focus()
+        self.unfocus()
 
         self.element = element
         self.settings = instance.settings
-        self.unfocus()
 
 ## Properties
 
     _height = LAYER_HEIGHT_EXPANDED
-
-    def _enterCb(self, zob, zob2, zob3):
-        print "walou"
 
     def setHeight(self, height):
         self._height = height
@@ -338,6 +337,9 @@ class TrackObject(View, goocanvas.Group, Zoomable):
         self.start_handle.props.visibility = goocanvas.ITEM_VISIBLE
         self.end_handle.props.visibility = goocanvas.ITEM_VISIBLE
         self.raise_(None)
+        for transition in self.uTrack.transitions:
+            print "transition raised"
+            transition.raise_(None)
 
     def unfocus(self):
         self.start_handle.props.visibility = goocanvas.ITEM_INVISIBLE
@@ -363,6 +365,8 @@ class TrackObject(View, goocanvas.Group, Zoomable):
             color = self.settings.audioClipBg
         else:
             color = self.settings.videoClipBg
+        if self.is_transition:
+            color = 0x0089CFF0
         pattern = unpack_cairo_gradient(color)
         self.bg.props.fill_pattern = pattern
 
