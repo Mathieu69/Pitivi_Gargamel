@@ -39,7 +39,7 @@ class TimelineObjectPropertyChangeTracker(PropertyChangeTracker):
     def connectToObject(self, timeline, obj):
         PropertyChangeTracker.connectToObject(self, obj)
         self.timeline = timeline
-        self.timeline.connect("disable-updates", self._timelineDisableUpdatesCb)
+        #self.timeline.connect("disable-updates", self._timelineDisableUpdatesCb)
 
     def disconnectFromObject(self, obj):
         self.timeline.disconnect_by_func(self._timelineDisableUpdatesCb)
@@ -130,7 +130,7 @@ class TimelineObjectAdded(UndoableAction):
         self.timeline = timeline
         self.timeline_object = timeline_object
         self.tracks = dict((track_object, track_object.track)
-                for track_object in timeline_object.track_objects)
+                for track_object in timeline_object.get_track_objects())
 
     def do(self):
         for track_object, track in self.tracks.iteritems():
@@ -394,13 +394,13 @@ class TimelineLogObserver(object):
         tracker = TimelineObjectPropertyChangeTracker()
         tracker.connectToObject(timeline, timeline_object)
         for property_name in tracker.property_names:
-            tracker.connect(property_name + "-changed",
+            tracker.connect("notify::" +property_name,
                     self._timelineObjectPropertyChangedCb, property_name)
         self.timeline_object_property_trackers[timeline_object] = tracker
 
         timeline_object.connect("track-object-added", self._timelineObjectTrackObjectAddedCb)
-        timeline_object.connect("track-object-removed", self._timelineObjectTrackObjectRemovedCb)
-        for obj in timeline_object.track_objects:
+        #timeline_object.connect("track-object-removed", self._timelineObjectTrackObjectRemovedCb)
+        for obj in timeline_object.get_track_objects():
             self._connectToTrackObject(obj)
 
     def _disconnectFromTimelineObject(self, timeline_object):
@@ -409,8 +409,8 @@ class TimelineLogObserver(object):
         tracker.disconnect_by_func(self._timelineObjectPropertyChangedCb)
 
     def _connectToTrackObject(self, track_object):
-        for prop, interpolator in track_object.getInterpolators().itervalues():
-            self._connectToInterpolator(interpolator)
+        #for prop, interpolator in track_object.getInterpolators().itervalues():
+            #self._connectToInterpolator(interpolator)
         if isinstance(track_object, TrackEffect):
             self.effect_properties_tracker.addEffectElement(track_object.getElement())
 
