@@ -36,6 +36,7 @@ ui_PYTHON =			\
 	effectlist.py	\
 	clipproperties.py	\
 	effectsconfiguration.py	\
+	publishtoweb.py	\
 	filechooserpreview.py	\
 	zoominterface.py
 
