@@ -42,6 +42,7 @@ class TimelineObjectPropertyChangeTracker(PropertyChangeTracker):
         #self.timeline.connect("disable-updates", self._timelineDisableUpdatesCb)
 
     def disconnectFromObject(self, obj):
+        return
         self.timeline.disconnect_by_func(self._timelineDisableUpdatesCb)
         PropertyChangeTracker.disconnectFromObject(self, obj)
 
@@ -129,7 +130,7 @@ class TimelineObjectAdded(UndoableAction):
     def __init__(self, timeline, timeline_object):
         self.timeline = timeline
         self.timeline_object = timeline_object
-        self.tracks = dict((track_object, track_object.track)
+        self.tracks = dict((track_object, track_object.get_track())
                 for track_object in timeline_object.get_track_objects())
 
     def do(self):
@@ -148,8 +149,8 @@ class TimelineObjectRemoved(UndoableAction):
     def __init__(self, timeline, timeline_object):
         self.timeline = timeline
         self.timeline_object = timeline_object
-        self.tracks = dict((track_object, track_object.track)
-                for track_object in timeline_object.track_objects)
+        self.tracks = dict((track_object, track_object.get_track())
+                for track_object in timeline_object.get_track_objects())
 
     def do(self):
         self.timeline.removeTimelineObject(self.timeline_object, deep=True)
