@@ -121,7 +121,7 @@ class ClipProperties(gtk.ScrolledWindow, Loggable):
         label.set_line_wrap(True)
         label.set_line_wrap_mode(pango.WRAP_WORD)
         label.set_justify(gtk.JUSTIFY_CENTER)
-        label.set_text(text)
+        label.set_markup(text)
 
         info_bar.add(label)
         self.info_bar_box.pack_start(info_bar, expand=False, fill=False)
@@ -404,8 +404,9 @@ class EffectProperties(gtk.Expander, gtk.HBox):
     def _showInfoBar(self):
         if self._info_bar is None:
             self.txtlabel, self._info_bar = self.clip_properties.addInfoBar(
-                                _("Select a clip on the timeline "
-                                  "to configure its associated effects"))
+                                _("<span>You must select <b>one</b> clip on the timeline "
+                                  "to configure its associated effects</span>"))
+
         self._info_bar.hide_all()
         self.txtlabel.show()
         self._info_bar.show()
