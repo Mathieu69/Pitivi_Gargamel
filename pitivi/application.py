@@ -62,6 +62,7 @@ from pitivi.ui.startupwizard import StartUpWizard
 # AND THEN load up the required parts.
 # This will result in a much better end-user experience
 
+ges.init()
 
 class Pitivi(Loggable, Signallable):
     """
