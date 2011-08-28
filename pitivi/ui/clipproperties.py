@@ -245,7 +245,6 @@ class EffectProperties(gtk.Expander, gtk.HBox):
 
     def _newProjectLoadedCb(self, app, project):
         self.clip_properties.project = project
-        self.selected_effects = self.timeline.selection.getSelectedTrackEffects()
         self._updateAll()
 
     def _vcontentNotifyCb(self, paned, gparamspec):
@@ -258,8 +257,6 @@ class EffectProperties(gtk.Expander, gtk.HBox):
 
     def _setTimeline(self, timeline):
         self._timeline = timeline
-        if timeline:
-            self.timeline.connect('selection-changed', self._selectionChangedCb)
 
     timeline = property(_getTimeline, _setTimeline)
 

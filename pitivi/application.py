@@ -370,6 +370,8 @@ class StartupWizardGuiPitivi(FullGuiPitivi):
 
     def __init__(self, debug=False):
         FullGuiPitivi.__init__(self, debug)
+        self.projectManager.newBlankProject()
+        self.gui.viewer.setPipeline()
 
     def _createGui(self):
         self.wizard = StartUpWizard(self)

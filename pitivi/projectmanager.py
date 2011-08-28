@@ -38,6 +38,7 @@ from pitivi.stream import AudioStream, VideoStream
 from pitivi.timeline.track import Track
 from pitivi.undo import UndoableAction
 
+from gst import ges
 
 class ProjectSettingsChanged(UndoableAction):
 
@@ -190,12 +191,6 @@ class ProjectManager(Signallable, Loggable):
         # FIXME: this should not be hard-coded
         # add default tracks for a new project
         settings = project.getSettings()
-        video = VideoStream(gst.Caps(settings.getVideoCaps()))
-        track = Track(video)
-        project.timeline.addTrack(track)
-        audio = AudioStream(gst.Caps(settings.getAudioCaps()))
-        track = Track(audio)
-        project.timeline.addTrack(track)
         project.connect("project-changed", self._projectChangedCb)
 
         self.emit("new-project-loaded", self.current)

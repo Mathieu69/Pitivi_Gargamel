@@ -24,7 +24,6 @@ Project class
 """
 
 from pitivi.log.loggable import Loggable
-from pitivi.timeline.timeline import Timeline
 from pitivi.pipeline import Pipeline
 from pitivi.factories.timeline import TimelineSourceFactory
 from pitivi.sourcelist import SourceList
@@ -33,6 +32,7 @@ from pitivi.signalinterface import Signallable
 from pitivi.action import ViewAction
 from pitivi.utils import Seeker
 import gst
+from gst import ges
 
 
 class ProjectError(Exception):
@@ -90,12 +90,14 @@ class Project(Signallable, Loggable):
 
         self._dirty = False
 
-        self.timeline = Timeline()
+        self.timeline = ges.timeline_new_audio_video()
+        self.layer = ges.TimelineLayer()
+        self.timeline.add_layer(self.layer)
 
-        self.factory = TimelineSourceFactory(self.timeline)
-        self.pipeline = Pipeline()
+        self.pipeline = ges.TimelinePipeline()
+        self.pipeline._setUp = False
+        self.pipeline.add_timeline(self.timeline)
         self.view_action = ViewAction()
-        self.view_action.addProducers(self.factory)
         self.seeker = Seeker(80)
 
         self.settings = ExportSettings()

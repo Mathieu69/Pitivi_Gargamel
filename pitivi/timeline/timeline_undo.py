@@ -32,14 +32,13 @@ from pitivi.effects import EffectGstElementPropertyChangeTracker
 
 class TimelineObjectPropertyChangeTracker(PropertyChangeTracker):
     # no out-point
-    property_names = ["start", "duration", "in-point",
-            "media-duration", "priority", "selected"]
+    property_names = ["start", "duration", "in-point", "priority"]
 
     _disabled = False
 
-    def connectToObject(self, obj):
+    def connectToObject(self, timeline, obj):
         PropertyChangeTracker.connectToObject(self, obj)
-        self.timeline = obj.timeline
+        self.timeline = timeline
         self.timeline.connect("disable-updates", self._timelineDisableUpdatesCb)
 
     def disconnectFromObject(self, obj):
@@ -369,9 +368,10 @@ class TimelineLogObserver(object):
 
     def startObserving(self, timeline):
         self._connectToTimeline(timeline)
-        for timeline_object in timeline.timeline_objects:
+        layer = timeline.get_layers()[0]
+        for timeline_object in layer.get_objects ():
             self._connectToTimelineObject(timeline_object)
-            for track_object in timeline_object.track_objects:
+            for track_object in timeline_object.get_track_objects():
                 self._connectToTrackObject(track_object)
 
     def stopObserving(self, timeline):
@@ -382,16 +382,17 @@ class TimelineLogObserver(object):
                 self._disconnectFromTrackObject(track_object)
 
     def _connectToTimeline(self, timeline):
-        timeline.connect("timeline-object-added", self._timelineObjectAddedCb)
-        timeline.connect("timeline-object-removed", self._timelineObjectRemovedCb)
+        layer = timeline.get_layers()[0]
+        layer.connect("object-added", self._timelineObjectAddedCb)
+        layer.connect("object-removed", self._timelineObjectRemovedCb)
 
     def _disconnectFromTimeline(self, timeline):
         timeline.disconnect_by_func(self._timelineObjectAddedCb)
         timeline.disconnect_by_func(self._timelineObjectRemovedCb)
 
-    def _connectToTimelineObject(self, timeline_object):
+    def _connectToTimelineObject(self, timeline, timeline_object):
         tracker = TimelineObjectPropertyChangeTracker()
-        tracker.connectToObject(timeline_object)
+        tracker.connectToObject(timeline, timeline_object)
         for property_name in tracker.property_names:
             tracker.connect(property_name + "-changed",
                     self._timelineObjectPropertyChangedCb, property_name)
@@ -433,7 +434,7 @@ class TimelineLogObserver(object):
         tracker.disconnect_by_func(self._interpolatorKeyframeMovedCb)
 
     def _timelineObjectAddedCb(self, timeline, timeline_object):
-        self._connectToTimelineObject(timeline_object)
+        self._connectToTimelineObject(timeline, timeline_object)
         action = self.timelineObjectAddedAction(timeline, timeline_object)
         self.log.push(action)
 

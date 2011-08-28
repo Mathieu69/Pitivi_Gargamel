@@ -9,13 +9,10 @@ TRACK_CONTROL_WIDTH = 75
 
 
 def track_name(track):
-    stream_type = type(track.stream)
-    if stream_type == stream.AudioStream:
+    if track.get_caps().to_string() == "audio/x-raw-int; audio/x-raw-float":
         track_name = _("Audio:")
-    elif stream_type == stream.VideoStream:
+    else:
         track_name = _("Video:")
-    elif stream_type == stream.TextStream:
-        track_name = _("Text:")
     return "<b>%s</b>" % track_name
 
 
@@ -33,14 +30,6 @@ class TrackControls(gtk.Label):
         if self.track:
             self._maxPriorityChanged(None, self.track.max_priority)
 
-    track = receiver(_setTrack)
-
-    @handler(track, "max-priority-changed")
-    def _maxPriorityChanged(self, track, max_priority):
-        self.set_size_request(TRACK_CONTROL_WIDTH, (1 +
-            max_priority) * (LAYER_HEIGHT_EXPANDED +
-            LAYER_SPACING))
-
 
 class TimelineControls(gtk.VBox):
     def __init__(self):
@@ -55,7 +44,7 @@ class TimelineControls(gtk.VBox):
         while self._tracks:
             self._trackRemoved(None, 0)
         if self.timeline:
-            for track in self.timeline.tracks:
+            for track in self.timeline.get_tracks():
                 self._trackAdded(None, track)
 
     timeline = receiver(_set_timeline)
