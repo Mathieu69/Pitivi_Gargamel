@@ -450,6 +450,7 @@ class Timeline(gtk.Table, Loggable, Zoomable):
             self._temp_objects = []
 
         self.drag_unhighlight()
+        self.app.projectManager.current.timeline.enable_update(True)
 
     def _dragDropCb(self, widget, context, x, y, timestamp):
         if  context.targets not in DND_EFFECT_LIST:
@@ -479,6 +480,7 @@ class Timeline(gtk.Table, Loggable, Zoomable):
 
     def _dragDataReceivedCb(self, unused_layout, context, x, y,
         selection, targetType, timestamp):
+        self.app.projectManager.current.timeline.enable_update(False)
         self.log("SimpleTimeline, targetType:%d, selection.data:%s" %
             (targetType, selection.data))
         # FIXME: let's have just one target type, call it
@@ -532,6 +534,8 @@ class Timeline(gtk.Table, Loggable, Zoomable):
         x, y = self._canvas.convert_from_pixels(x - offset, y)
         priority = int((y // (LAYER_HEIGHT_EXPANDED + LAYER_SPACING)))
         delta = Zoomable.pixelToNs(x)
+        obj = self._temp_objects[0]
+        obj.starting_start = obj.get_property("start")
         self._move_context.editTo(delta, priority)
 
 ## Zooming and Scrolling
