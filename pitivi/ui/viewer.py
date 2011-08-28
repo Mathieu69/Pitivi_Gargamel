@@ -26,7 +26,7 @@ from gtk import gdk
 import gst
 from math import pi
 import cairo
-from gst import ges
+import ges
 
 from gettext import gettext as _
 
@@ -448,7 +448,7 @@ class PitiviViewer(gtk.VBox, Loggable):
 
     def _sliderScrollCb(self, unused_slider, event):
         if event.direction == gtk.gdk.SCROLL_LEFT:
-            amount = -gst.SECOND
+            amount = - gst.SECOND
         else:
             amount = gst.SECOND
         self.seekRelative(amount)
@@ -516,7 +516,7 @@ class PitiviViewer(gtk.VBox, Loggable):
         self.seek(0)
 
     def _backCb(self, unused_button):
-        self.seekRelative(-gst.SECOND)
+        self.seekRelative(0 - gst.SECOND)
 
     def _playButtonCb(self, unused_button, playing):
         if playing:
@@ -621,7 +621,7 @@ class PitiviViewer(gtk.VBox, Loggable):
             self.warning("seek failed")
 
     def _posCb(self):
-        if not self.playing :
+        if not self.playing:
             return False
         try:
             position = self.pipeline.query_position(gst.FORMAT_TIME)[0]
@@ -662,6 +662,7 @@ class PitiviViewer(gtk.VBox, Loggable):
 
 
 class Point():
+
     def __init__(self, x, y, settings):
         self.x = x
         self.y = y

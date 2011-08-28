@@ -38,7 +38,7 @@ from pitivi.stream import AudioStream, VideoStream
 from pitivi.timeline.track import Track
 from pitivi.undo import UndoableAction
 
-from gst import ges
+import ges
 
 class ProjectSettingsChanged(UndoableAction):
 

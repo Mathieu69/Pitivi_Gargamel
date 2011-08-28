@@ -4,7 +4,7 @@ from pitivi.timeline.track import TrackEffect
 from pitivi.receiver import receiver, handler
 from pitivi.ui.common import LAYER_HEIGHT_EXPANDED, LAYER_HEIGHT_COLLAPSED, LAYER_SPACING
 import goocanvas
-from gst import ges
+import ges
 import gobject
 
 class Transition(goocanvas.Rect, Zoomable):

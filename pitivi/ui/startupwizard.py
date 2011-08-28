@@ -22,7 +22,7 @@
 import os
 import gtk
 import webbrowser
-from gst import ges
+import ges
 
 from gettext import gettext as _
 

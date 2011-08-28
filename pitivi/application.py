@@ -55,6 +55,7 @@ from pitivi.sourcelist_undo import SourceListLogObserver
 from pitivi.ui.viewer import PitiviViewer
 from pitivi.actioner import Renderer, Previewer
 from pitivi.ui.startupwizard import StartUpWizard
+import ges
 
 # FIXME : Speedup loading time
 # Currently we load everything in one go

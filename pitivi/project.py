@@ -32,7 +32,7 @@ from pitivi.signalinterface import Signallable
 from pitivi.action import ViewAction
 from pitivi.utils import Seeker
 import gst
-from gst import ges
+import ges
 
 
 class ProjectError(Exception):
