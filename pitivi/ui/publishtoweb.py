@@ -236,6 +236,7 @@ storage will not be secure. Install python-gnomekeyring.")
         else:
             status, exception = result
             self.login_status.set_text(_('Unable to login'))
+            self.window.set_page_complete(self.login_page, False)
 
     def _titleChangedCb(self, entry):
         self.metadata["title"] = entry.get_text()
