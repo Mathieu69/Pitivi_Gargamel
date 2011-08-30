@@ -123,12 +123,13 @@ storage will not be secure. Install python-gnomekeyring.")
         self.window.connect("delete-event", self._deleteEventCb)
 
         self.metadata = {
-            "title": "",
+            "title": self.project.name,
             "description": "",
             "private": False,
             "category": None,
             "tags": "",
         }
+        self.builder.get_object("title").set_text(self.project.name)
         self.has_started_rendering = False
         self.window.set_forward_page_func(self.page_func)
 
@@ -167,14 +168,6 @@ storage will not be secure. Install python-gnomekeyring.")
             atts = {'username': 'pitivi', 'server': 'Youtube', 'service': 'HTTP', 'port': '80'}
             a = gk.item_create_sync('pitivi', gk.ITEM_GENERIC_SECRET,
                 self.username.get_text(), atts, self.password.get_text(), True)
-
-    def _update_metadata_page_complete(self):
-        is_complete = all([
-            len(self.metadata["title"]) != 0,
-            len(self.metadata["description"]) != 0,
-        ])
-
-        self.window.set_page_complete(self.metadata_page, is_complete)
 
     def _startRendering(self):
 
@@ -246,11 +239,9 @@ storage will not be secure. Install python-gnomekeyring.")
 
     def _titleChangedCb(self, entry):
         self.metadata["title"] = entry.get_text()
-        self._update_metadata_page_complete()
 
     def _descriptionChangedCb(self, entry):
         self.metadata["description"] = entry.get_text()
-        self._update_metadata_page_complete()
 
     def _tagsChangedCb(self, entry):
         self.metadata["tags"] = entry.get_text()
