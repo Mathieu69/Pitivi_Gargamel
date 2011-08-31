@@ -76,9 +76,9 @@ class ClipProperties(gtk.ScrolledWindow, Loggable):
         self._project = None
         self.transformation_expander = None
         self.info_bar_box = gtk.VBox()
-        self.set_homogeneous(False)
 
         vbox = gtk.VBox()
+        vbox.set_homogeneous(False)
         vp.add(vbox)
 
         self.effect_properties_handling = EffectsPropertiesHandling(instance.action_log)
@@ -320,7 +320,6 @@ class EffectProperties(gtk.Expander, gtk.HBox):
             self.timeline_objects[0].get_timeline_object().add_track_object(effect)
             self.timeline_objects[1].get_track().add_object(effect)
             self._updateAll()
-            print effect.get_property("priority"), "effect prio"
             self.app.action_log.commit()
 
     def _dragDataReceivedCb(self, unused_layout, context, unused_x, unused_y,
@@ -381,7 +380,6 @@ class EffectProperties(gtk.Expander, gtk.HBox):
             self._vcontent.show()
         self._removeEffectBt.set_sensitive(False)
         if len(self.timeline_objects) >= 1:
-            print "ok"
             self._setEffectDragable()
             self._updateTreeview()
             self._updateEffectConfigUi()
@@ -393,7 +391,6 @@ class EffectProperties(gtk.Expander, gtk.HBox):
 
         obj = self.timeline_objects[0].get_timeline_object()
         for track_effect in obj.get_top_effects():
-            print track_effect
             to_append = [track_effect.get_property("active")]
             if track_effect.get_track().get_caps().to_string() == "audio/x-raw-int; audio/x-raw-float":
                 to_append.append("Audio")
@@ -534,7 +531,6 @@ class TransformationProperties(gtk.Expander):
         self.disconnectSpinButtonsFromFlush()
         for name, spinbtn in self.spin_buttons.items():
             spinbtn.set_value(self.default_values[name])
-        self.app.gui.viewer.pipeline.flushSeekVideo()
         self.connectSpinButtonsToFlush()
         self.track_effect.gnl_object.props.active = False
 
@@ -560,8 +556,8 @@ class TransformationProperties(gtk.Expander):
     def _onValueChangedCb(self, spinbtn, prop):
         value = spinbtn.get_value()
 
-        if value != self.default_values[prop] and not self.track_effect.gnl_object.props.active:
-            self.track_effect.gnl_object.props.active = True
+        if value != self.default_values[prop] and not self.track_effect.get_gnlobject().props.active:
+            self.track_effect.get_gnlobject().props.active = True
 
         if value != self.effect.get_property(prop):
             self.action_log.begin("Transformation property change")
@@ -575,34 +571,46 @@ class TransformationProperties(gtk.Expander):
             box.update_from_effect(self.effect)
 
     def _flushPipeLineCb(self, widget):
-        self.app.gui.viewer.pipeline.flushSeekVideo()
+        return
 
     def _findEffect(self, name):
-        for track_effect in self._current_tl_obj.track_objects:
-            if isinstance(track_effect, TrackEffect):
-                if name in track_effect.getElement().get_path_string():
+        for track_effect in self._current_tl_obj.get_track_objects():
+            if isinstance(track_effect, ges.TrackParseLaunchEffect):
+                if name in track_effect.get_property("bin-description"):
                         self.track_effect = track_effect
-                        return track_effect.getElement()
+                        return track_effect.get_element()
 
     def _findOrCreateEffect(self, name):
         effect = self._findEffect(name)
         if not effect:
-            factory = self.app.effects.getFactoryFromName(name)
-            self.timeline.addEffectFactoryOnObject(factory, [self._current_tl_obj])
+            effect = ges.TrackParseLaunchEffect(name)
+            self._current_tl_obj.add_track_object(effect)
+            tracks = self.app.projectManager.current.timeline.get_tracks()
+            for track in tracks:
+                if track.get_caps().to_string() == "video/x-raw-yuv; video/x-raw-rgb":
+                    track.add_object(effect)
             effect = self._findEffect(name)
             # disable the effect on default
-            self.track_effect.gnl_object.props.active = False
+            a = self.track_effect.get_gnlobject()
+            self.effect = list(list(a.elements())[0].elements())[1]
+            self.track_effect.get_gnlobject().props.active = False
         self.app.gui.viewer.internal.set_transformation_properties(self)
         effect.freeze_notify()
-        return effect
+        return self.effect
 
-    def _selectionChangedCb(self, timeline):
-        if self.timeline and len(self.timeline.selection.selected) > 0:
-            for tl_obj in self.timeline.selection.selected:
+    def _selectionChangedCb(self, project, element):
+        self.timeline_objects = []
+        if isinstance(element, set):
+            for elem in element:
+                self.timeline_objects.append(elem)
+        else:
+            self.timeline_objects.append(element)
+        if len(self.timeline_objects) > 0:
+            for tl_obj in self.timeline_objects:
                 pass
 
-            if tl_obj != self._current_tl_obj:
-                self._current_tl_obj = tl_obj
+            if tl_obj.get_timeline_object() != self._current_tl_obj:
+                self._current_tl_obj = tl_obj.get_timeline_object()
                 self.effect = None
 
             self.set_sensitive(True)
@@ -613,7 +621,6 @@ class TransformationProperties(gtk.Expander):
             if self._current_tl_obj:
                 self._current_tl_obj = None
                 self.zoom_scale.set_value(1.0)
-                self.app.gui.viewer.pipeline.flushSeekVideo()
             self.effect = None
             self.set_sensitive(False)
         self._updateBoxVisibility()
@@ -630,7 +637,7 @@ class TransformationProperties(gtk.Expander):
     def _setTimeline(self, timeline):
         self._timeline = timeline
         if timeline:
-            self.timeline.connect('selection-changed', self._selectionChangedCb)
+            self.app.projectManager.current.connect('selected-changed', self._selectionChangedCb)
 
     timeline = property(_getTimeline, _setTimeline)
 
@@ -646,7 +653,7 @@ class SpeedProperties(gtk.Expander, gtk.HBox):
         self.speedtable = gtk.VBox()
         self.entry = gtk.Entry()
         self.app = instance
-        self.speedtable.pack_start(self.entry, expand = False, fill = False)
+        self.speedtable.pack_start(self.entry, expand=False, fill=False)
         self.entry.connect("activate", self._activatedCb)
         self.speedtable.show_all()
         self.add(self.speedtable)
@@ -654,9 +661,7 @@ class SpeedProperties(gtk.Expander, gtk.HBox):
 
     def _activatedCb(self, unused):
         for obj in self.app.projectManager.current.timeline.selected:
-            print obj.get_timeline_object()
-            obj.get_timeline_object().set_priority(int(self.entry.get_text()))
-            #obj.set_priority(int(self.entry.get_text()))
+            pass
 
     def _expandedCb(self, expander, params):
         self._updateAll()
