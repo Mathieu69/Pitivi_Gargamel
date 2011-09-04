@@ -271,7 +271,7 @@ storage will not be secure. Install python-gnomekeyring.")
             self.verifier_url.set_uri(self.uploader.get_oauth_url())
 
         self.categories.show()
-        self.categories.set_title("Choose a category")
+        self.categories.set_title(_("Choose a category"))
         for e in catlist:
             self.categories.append_text(e)
         self.window.set_page_complete(self.service_page, True)
