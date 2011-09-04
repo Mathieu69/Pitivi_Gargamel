@@ -33,21 +33,21 @@ from pitivi.actioner import Renderer
 from pitivi import configure
 from pitivi.uploader import YTUploader, DMUploader, VimeoUploader
 from gettext import gettext as _
-from gobject import timeout_add
-from string import ascii_lowercase, ascii_uppercase, maketrans, translate
 from pitivi.utils import beautify_length
-try :
+try:
     import gnomekeyring as gk
     unsecure_storing = False
-except :
+except:
     unsecure_storing = True
-import pycurl
 
 catlist = []
 
+
 dailymotion_cat = ['News', 'Shortfilms', 'Music', 'Sport', 'Tech', 'Travel', 'Auto', 'Creation', 'Webcam', 'People', 'Lifestyle', 'Fun', 'Videogames', 'Animals', 'School']
 
+
 youtube_cat = ['Film', 'Autos', 'Music', 'Animals', 'Sports', 'Travel', 'Games', 'Comedy', 'People', 'News', 'Entertainment', 'Education', 'Howto', 'Nonprofit', 'Tech']
+
 
 class PublishToWebDialog(Renderer):
 
@@ -73,7 +73,7 @@ class PublishToWebDialog(Renderer):
         self.app.publish_button.set_sensitive(False)
 
         #Auto-completion
-        if unsecure_storing :
+        if unsecure_storing:
             self.builder.get_object("checkbutton1").set_label("Remember me ! Warning : \
 storage will not be secure. Install python-gnomekeyring.")
             if self.app_settings.login:
@@ -83,7 +83,7 @@ storage will not be secure. Install python-gnomekeyring.")
             item_keys = gk.list_item_ids_sync('pitivi')
             gk.unlock_sync('pitivi', 'gkpass')
             item_info = gk.item_get_info_sync('pitivi', item_keys[0])
-            if item_info :
+            if item_info:
                 self.username.set_text(item_info.get_display_name())
                 self.password.set_text(item_info.get_secret())
             gk.lock_sync('pitivi')
@@ -91,7 +91,6 @@ storage will not be secure. Install python-gnomekeyring.")
         self.uploader = YTUploader()
         self.categories = gtk.combo_box_new_text()
         self.builder.get_object("table2").attach(self.categories, 1, 2, 3, 4)
-
 
         self.uploadbar = gtk.ProgressBar()
         self.stopbutton = gtk.ToolButton(gtk.STOCK_CANCEL)
@@ -139,7 +138,6 @@ storage will not be secure. Install python-gnomekeyring.")
         else:
             return current_page + 1
 
-
     def _setProperties(self):
         self.window = self.builder.get_object("publish-assistant")
         self.description = self.builder.get_object("description")
@@ -163,14 +161,10 @@ storage will not be secure. Install python-gnomekeyring.")
             self.app_settings.login = self.username.get_text()
             self.app_settings.password = self.password.get_text()
             self.app_settings.storeSettings()
-        else :
+        else:
             if "pitivi" not in gk.list_keyring_names_sync():
                 gk.create_sync('pitivi', 'gkpass')
-            atts = {'username':'pitivi',
-                    'server':'Youtube',
-                    'service':'HTTP',
-                    'port':'80',
-                   }
+            atts = {'username': 'pitivi', 'server': 'Youtube', 'service': 'HTTP', 'port': '80'}
             a = gk.item_create_sync('pitivi', gk.ITEM_GENERIC_SECRET,
                 self.username.get_text(), atts, self.password.get_text(), True)
 
@@ -188,14 +182,13 @@ storage will not be secure. Install python-gnomekeyring.")
 
         # Start rendering:
         self.filename = self.filebutton.get_uri() + "/" + self.fileentry.get_text()
-        Renderer.__init__(self, self.project, self.pipeline, outfile =
-                self.filename)
+        Renderer.__init__(self, self.project, self.pipeline, outfile=self.filename)
         self.app.set_sensitive(False)
         self.startAction()
         self.renderbar.set_fraction(0)
         self.visible = True
 
-    def updatePosition(self, fraction, estimated, uploading = False):
+    def updatePosition(self, fraction, estimated, uploading=False):
         if not uploading:
             self.renderbar.set_fraction(fraction)
             self.app.set_title(_("%d%% Rendered") % int(100 * fraction))
@@ -229,17 +222,15 @@ storage will not be secure. Install python-gnomekeyring.")
         self.uploader.authenticate_with_verifier(self.verifier.get_text(), self._verifierResultCb)
         self.window.set_page_complete(self.verifier_page, True)
 
-
     def _verifierResultCb(self, result):
         if result == 'good':
             self.window.set_page_complete(self.verifier_page, True)
 
-
     def _loginClickedCb(self, *args):
         self.debug("login clicked")
-        self.login_status.set_text("Logging in...")
+        self.login_status.set_text(_("Logging in..."))
         # TODO: This should activate a throbber
-        thread.start_new_thread (self.uploader.authenticate_with_password, (self.username.get_text(),
+        thread.start_new_thread(self.uploader.authenticate_with_password, (self.username.get_text(),
             self.password.get_text(), self._loginResultCb))
 
     def _loginResultCb(self, result):
@@ -251,8 +242,7 @@ storage will not be secure. Install python-gnomekeyring.")
             self.window.set_current_page(self.window.get_current_page() + 2)
         else:
             status, exception = result
-            self.login_status.set_text('Unable to login')
-            self.window.set_page_complete(_verifierChangedCb_verifierChangedCbself.login_page, False)
+            self.login_status.set_text(_('Unable to login'))
 
     def _titleChangedCb(self, entry):
         self.metadata["title"] = entry.get_text()
@@ -276,7 +266,7 @@ storage will not be secure. Install python-gnomekeyring.")
 
         else:
             self.uploader = VimeoUploader()
-            catlist= []
+            catlist = []
             self.verifier_url.set_label(self.uploader.get_oauth_url())
             self.verifier_url.set_uri(self.uploader.get_oauth_url())
 
@@ -289,7 +279,7 @@ storage will not be secure. Install python-gnomekeyring.")
     def _categoryChangedCb(self, combo):
         self.metadata["category"] = combo.get_active_text()
 
-    def _changeStatusCb (self, button):
+    def _changeStatusCb(self, button):
         if button.get_active():
             self.metadata["private"] = True
         else:
@@ -315,7 +305,7 @@ storage will not be secure. Install python-gnomekeyring.")
         if timediff > 3.0:
             totaltime = (timediff * float(total) / float(done)) - timediff
             text = beautify_length(int(totaltime * SECOND))
-            self.updatePosition(fraction, text, uploading = True)
+            self.updatePosition(fraction, text, uploading=True)
 
     def _uploadDoneCb(self, video_entry):
         self.entry = gtk.Entry()
@@ -325,7 +315,7 @@ storage will not be secure. Install python-gnomekeyring.")
             link = video_entry
         self.entry.set_text(link)
         self.uploadbar.destroy()
-        self.hbox.pack_start (self.entry)
+        self.hbox.pack_start(self.entry)
         self.entry.show()
 
     def _mainQuitCb(self, ignored):
@@ -339,7 +329,7 @@ storage will not be secure. Install python-gnomekeyring.")
         self.debug("cancel event")
         self._shutDown()
 
-    def _destroyCb (self, ignored):
+    def _destroyCb(self, ignored):
         self._shutDown()
 
     def _finishCb(self, unused):
