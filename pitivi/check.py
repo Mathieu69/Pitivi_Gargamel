@@ -172,8 +172,15 @@ def initial_checks():
     # The following are soft dependencies
     # Note that instead of checking for plugins using gst.registry_get_default().find_plugin("foo"),
     # we could check for elements using gst.element_factory_make("foo")
+    if not __try_import__("oauth2"):
+        soft_deps["oauth2"] = _("Enables the web publishing feature")
+
+    if not __try_import__("gdata"):
+        soft_deps["gdata"] = _("Enables the web publishing feature")
+
     if not __try_import__("numpy"):
         soft_deps["NumPy"] = _("Enables the autoalign feature")
+
     try:
         #if not gst.registry_get_default().find_plugin("frei0r"):
         gst.element_factory_make("frei0r-filter-scale0tilt")

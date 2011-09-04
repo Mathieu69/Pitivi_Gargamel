@@ -29,6 +29,8 @@ import gtk
 import gst
 from urllib import unquote
 import webbrowser
+from pitivi.ui.depsmanager import DepsManager
+from pitivi.check import soft_deps
 
 try:
     import gconf
@@ -135,13 +137,12 @@ GlobalSettings.addConfigOption('password',
     section='Authentification',
     key='pass',
     type_=str,
-    default = None)
+    default=None)
 GlobalSettings.addConfigOption('login',
     section='Authentification',
     key='log',
     type_=str,
-    default = None)
-
+    default=None)
 
 
 def supported(info):
@@ -268,9 +269,11 @@ class PitiviMainWindow(gtk.Window, Loggable):
             project.pipeline.pause()
         win = PublishToWebDialog(self, project)
 
-
     def _publishCb(self, unused_button):
-        self.showPublishToWebDialog(self.project)
+        if "oauth2" in soft_deps or "gdata" in soft_deps:
+            DepsManager(self.app)
+        else:
+            self.showPublishToWebDialog(self.project)
 
     def _setActions(self, instance):
         PLAY = _("Start Playback")
@@ -292,7 +295,7 @@ class PitiviMainWindow(gtk.Window, Loggable):
              None, _("Edit the project settings"), self._projectSettingsCb),
             ("RenderProject", 'pitivi-render', _("_Render..."),
              None, _("Export your project as a finished movie"), self._recordCb),
-            ("PublishToWeb", 'pitivi-publish' , _("_Publish to Web"),
+            ("PublishToWeb", 'pitivi-publish', _("_Publish to Web"),
              None, _("Publish to Web"), self._publishCb),
             ("Undo", gtk.STOCK_UNDO,
              _("_Undo"),
