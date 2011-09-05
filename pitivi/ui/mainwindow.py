@@ -132,14 +132,14 @@ GlobalSettings.addConfigOption('effectVPanedPosition',
     section='effect-configuration',
     key='effect-vpaned-position',
     type_=int)
-GlobalSettings.addConfigSection("Authentification")
+GlobalSettings.addConfigSection("authentification")
 GlobalSettings.addConfigOption('password',
-    section='Authentification',
+    section='authentification',
     key='pass',
     type_=str,
     default=None)
 GlobalSettings.addConfigOption('login',
-    section='Authentification',
+    section='authentification',
     key='log',
     type_=str,
     default=None)
@@ -191,6 +191,7 @@ class PitiviMainWindow(gtk.Window, Loggable):
     @cvar project: The current project
     @type project: L{Project}
     """
+
     def __init__(self, instance, allow_full_screen=True):
         """ initialize with the Pitivi object """
         gtk.Window.__init__(self)
