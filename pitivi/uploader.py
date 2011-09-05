@@ -2,7 +2,8 @@
 #
 #       uploader.py
 #
-# Copyright (c) 2010, Mathieu Duponchelle <seeed@laposte.net>
+# Copyright (c) 2011, Mathieu Duponchelle <mduponchelle1@gmail.com>
+# Copyright (c) 2011, Feroze Naina <ferozenaina@gmail.com>
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU Lesser General Public
@@ -84,6 +85,7 @@ class ResumableYouTubeUploader(object):
 
 
 class UploadBase():
+
     def __init__(self):
         self.uploader = None
 
@@ -95,6 +97,7 @@ class UploadBase():
 
 
 class YTUploader(UploadBase):
+
     def __init__(self):
         UploadBase.__init__(self)
         self.auth_type = 'password'
@@ -129,6 +132,7 @@ class YTUploader(UploadBase):
 
 
 class DMUploader(UploadBase):
+
     def __init__(self):
         UploadBase.__init__(self)
         self.BASE = 'https://api.dailymotion.com/json'
@@ -144,8 +148,7 @@ class DMUploader(UploadBase):
                   'client_secret': self.SECRET,
                   'username': username,
                   'password': password,
-                  'scope': 'write read'
-                  }
+                  'scope': 'write read'}
         data = urlencode(values)
         try:
             req = urllib2.Request(self.OAUTH, data)
@@ -199,6 +202,7 @@ class DMUploader(UploadBase):
 
 
 class DailyMotionFileUpload(object):
+
     def __init__(self, filepath, upload_url):
 
         self.upload_url = upload_url
@@ -218,6 +222,7 @@ class DailyMotionFileUpload(object):
 
 
 class VimeoUploader(UploadBase):
+
     def __init__(self):
         UploadBase.__init__(self)
         self.REST_URL = 'http://vimeo.com/api/rest/v2'
@@ -325,6 +330,7 @@ class VimeoUploader(UploadBase):
 
 
 class VimeoFileUpload(object):
+
     def __init__(self, filepath, upload_url):
         self.upload_url = upload_url
         self.fileread = open(filepath)

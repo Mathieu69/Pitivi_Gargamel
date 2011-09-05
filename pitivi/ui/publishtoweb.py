@@ -2,7 +2,8 @@
 #
 #       ui/publishtoyoutubedialog.py
 #
-# Copyright (c) 2010, Mathieu Duponchelle <seeed@laposte.net>
+# Copyright (c) 2011, Mathieu Duponchelle <mduponchelle1@gmail.com>
+# Copyright (c) 2011, Feroze Naina <ferozenaina@gmail.com>
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU Lesser General Public
