@@ -30,12 +30,8 @@ import ges
 
 from gettext import gettext as _
 
-from pitivi.action import ViewAction
-
-from pitivi.stream import VideoStream
 from pitivi.utils import time_to_string, Seeker
 from pitivi.log.loggable import Loggable
-from pitivi.pipeline import PipelineError
 from pitivi.ui.common import SPACING, hex_to_rgb
 from pitivi.settings import GlobalSettings
 from pitivi.ui.dynamic import TimeWidget
@@ -255,7 +251,7 @@ class PitiviViewer(gtk.VBox, Loggable):
             self.emit("activate-playback-controls", True)
 
     def _getDefaultAction(self):
-        return ViewAction()
+        return
 
     def _externalWindowDeleteCb(self, window, event):
         self.dock()

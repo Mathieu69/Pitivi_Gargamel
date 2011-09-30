@@ -25,11 +25,9 @@ Handles the list of source for a project
 """
 
 import urllib
-from pitivi.discoverer import Discoverer
 from pitivi.signalinterface import Signallable
 from pitivi.log.loggable import Loggable
 import gst
-from pitivi.factories.file import FileSourceFactory
 
 
 class SourceListError(Exception):
@@ -95,8 +93,7 @@ class SourceList(Signallable, Loggable):
             self.emit("discovery-error", uri, e, "")
             return
 
-        factory = FileSourceFactory(uri)
-        self.addFactory(factory)
+        self.addFactory(uri)
 
     def addUris(self, uris):
         """
@@ -135,17 +132,17 @@ class SourceList(Signallable, Loggable):
             raise SourceListError("URI not in the sourcelist", uri)
         return factory
 
-    def addFactory(self, factory):
+    def addFactory(self, uri):
         """
         Add the specified SourceFactory to the list of sources.
         """
-        if self._sources.get(factory.uri, None) is not None:
+        if self._sources.get(uri, None) is not None:
             raise SourceListError("We already have a factory for this URI",
-                    factory.uri)
-        self._sources[factory.uri] = factory
-        self._ordered_sources.append(factory)
+                    uri)
+        self._sources[uri] = uri
+        self._ordered_sources.append(uri)
         self.nb_imported_files += 1
-        self.emit("source-added", factory)
+        self.emit("source-added", uri)
 
     def getSources(self):
         """ Returns the list of sources used.

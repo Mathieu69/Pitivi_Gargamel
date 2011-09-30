@@ -2,7 +2,6 @@ SUBDIRS = \
 	ui 		\
 	elements 	\
 	factories	\
-	formatters	\
 	timeline	\
 	log
 

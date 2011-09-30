@@ -41,11 +41,8 @@ from pitivi.ui.viewer import PitiviViewer
 from pitivi.configure import pitivi_version, APPNAME, APPURL, \
      get_pixmap_dir, get_ui_dir
 from pitivi.ui import dnd
-from pitivi.pipeline import Pipeline
-from pitivi.action import ViewAction
 from pitivi.settings import GlobalSettings
 from pitivi.receiver import receiver, handler
-import pitivi.formatters.format as formatter
 from pitivi.sourcelist import SourceListError
 from pitivi.ui.sourcelist import SourceList
 from pitivi.ui.effectlist import EffectList
@@ -54,7 +51,7 @@ from pitivi.ui.common import SPACING
 from pitivi.ui.common import factory_name
 from pitivi.utils import beautify_length, show_user_manual
 from pitivi.ui.zoominterface import Zoomable
-from pitivi.ui.filechooserpreview import PreviewWidget
+#from pitivi.ui.filechooserpreview import PreviewWidget
 
 
 GlobalSettings.addConfigOption("fileSupportEnabled",
@@ -652,7 +649,7 @@ class PitiviMainWindow(gtk.Window, Loggable):
         if response == gtk.RESPONSE_OK:
             uri = chooser.get_uri()
             uri = unquote(uri)
-            self.app.projectManager.loadProject(uri)
+            self.app.gui.viewer.loadProject(uri)
 
         chooser.destroy()
         return True
@@ -882,10 +879,10 @@ class PitiviMainWindow(gtk.Window, Loggable):
 
         chooser = gtk.FileChooserWidget(action=gtk.FILE_CHOOSER_ACTION_OPEN)
         chooser.set_select_multiple(False)
-        pw = PreviewWidget(self.app)
-        chooser.set_preview_widget(pw)
+        #pw = PreviewWidget(self.app)
+        #chooser.set_preview_widget(pw)
         chooser.set_use_preview_label(False)
-        chooser.connect('update-preview', pw.add_preview_request)
+        #chooser.connect('update-preview', pw.add_preview_request)
         chooser.set_current_folder(self.settings.lastProjectFolder)
         dialog.get_content_area().pack_start(chooser, True, True)
         chooser.show()

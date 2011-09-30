@@ -24,12 +24,9 @@ Project class
 """
 
 from pitivi.log.loggable import Loggable
-from pitivi.pipeline import Pipeline
-from pitivi.factories.timeline import TimelineSourceFactory
 from pitivi.sourcelist import SourceList
 from pitivi.settings import ExportSettings
 from pitivi.signalinterface import Signallable
-from pitivi.action import ViewAction
 from pitivi.utils import Seeker
 import gst
 import ges
@@ -95,7 +92,6 @@ class Project(Signallable, Loggable):
         self.pipeline = ges.TimelinePipeline()
         self.pipeline._setUp = False
         self.pipeline.add_timeline(self.timeline)
-        self.view_action = ViewAction()
         self.seeker = Seeker(80)
 
         self.settings = ExportSettings()
@@ -144,6 +140,6 @@ class Project(Signallable, Loggable):
 
         for fact in self.sources.getSources():
             fact.setFilterCaps(self._videocaps)
-        if self.pipeline.getState() != gst.STATE_NULL:
-            self.pipeline.stop()
-            self.pipeline.pause()
+        if self.pipeline.get_state() != gst.STATE_NULL:
+            self.pipeline.set_state(gst.STATE_READY)
+            self.pipeline.set_state(gst.STATE_PAUSED)

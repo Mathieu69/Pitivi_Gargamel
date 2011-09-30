@@ -1,11 +1,11 @@
 from pitivi.ui.zoominterface import Zoomable
 from pitivi.ui.trackobject import TrackObject
-from pitivi.timeline.track import TrackEffect
 from pitivi.receiver import receiver, handler
 from pitivi.ui.common import LAYER_HEIGHT_EXPANDED, LAYER_HEIGHT_COLLAPSED, LAYER_SPACING
 import goocanvas
 import ges
 import gobject
+
 
 class Transition(goocanvas.Rect, Zoomable):
 
@@ -83,10 +83,10 @@ class Track(goocanvas.Group, Zoomable):
     def getHeight(self):
         track_objects = self.track.get_objects()
         max_priority = 0
-        for track_object in track_objects :
-            if isinstance (track_object, ges.TrackAudioTestSource):
+        for track_object in track_objects:
+            if isinstance(track_object, ges.TrackAudioTestSource):
                 break
-            if isinstance (track_object, ges.TrackVideoTestSource):
+            if isinstance(track_object, ges.TrackVideoTestSource):
                 break
             priority = track_object.get_priority()
             if priority > max_priority:
@@ -115,25 +115,24 @@ class Track(goocanvas.Group, Zoomable):
 
     @handler(track, "track-object-added")
     def _objectAdded(self, unused_timeline, track_object):
-        if isinstance (track_object, ges.TrackParseLaunchEffect):
+        if isinstance(track_object, ges.TrackParseLaunchEffect):
             return
-        if isinstance (track_object, ges.TrackAudioTestSource):
+        if isinstance(track_object, ges.TrackAudioTestSource):
             return
-        if isinstance (track_object, ges.TrackVideoTestSource):
+        if isinstance(track_object, ges.TrackVideoTestSource):
             return
-        if isinstance (track_object, ges.TrackVideoTestSource):
+        if isinstance(track_object, ges.TrackAudioTransition):
+            self._transitionAdded(track_object)
             return
-        if isinstance (track_object, ges.TrackAudioTransition):
-            self._transitionAdded (track_object)
-            return
-        if isinstance (track_object, ges.TrackVideoTransition):
-            self._transitionAdded (track_object)
+        if isinstance(track_object, ges.TrackVideoTransition):
+            self._transitionAdded(track_object)
             return
         gobject.timeout_add(1, self.check, track_object)
 
     def check(self, tr_obj):
         if tr_obj.get_timeline_object():
             w = TrackObject(self.app, tr_obj, self.track, self.timeline)
+            self.app.current.sources.addUri(tr_obj.get_timeline_object().get_uri())
             self.widgets[tr_obj] = w
             self.add_child(w)
             self.app.gui.setBestZoomRatio()

@@ -43,7 +43,7 @@ from pitivi.ui.filelisterrordialog import FileListErrorDialog
 from pitivi.ui.common import SPACING
 from pitivi.ui.alignmentprogress import AlignmentProgressDialog
 from pitivi.ui.depsmanager import DepsManager
-from pitivi.timeline.align import AutoAligner
+#from pitivi.timeline.align import AutoAligner
 from pitivi.check import soft_deps
 
 
@@ -419,7 +419,7 @@ class Timeline(gtk.Table, Loggable, Zoomable):
         #FIXME, GES break, temporary hack
         uris = self.selection_data.split("\n")
         layer = self.app.projectManager.current.timeline.get_layers()[0]
-        for uri in uris :
+        for uri in uris:
             src = ges.TimelineFileSource(uri)
             layer.add_object(src)
 
@@ -543,7 +543,7 @@ class Timeline(gtk.Table, Loggable, Zoomable):
         self._vscrollbar.set_value(self._vscrollbar.get_value() +
             self.vadj.props.page_size ** (2.0 / 3.0))
 
-    def unsureVadjHeight (self):
+    def unsureVadjHeight(self):
         self._scroll_pos_ns = Zoomable.pixelToNs(self.hadj.get_value())
         self._root_item.set_simple_transform(-self.hadj.get_value(),
             -self.vadj.get_value(), 1.0, 0)

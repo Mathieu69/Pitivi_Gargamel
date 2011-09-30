@@ -33,7 +33,6 @@ from gettext import gettext as _
 from pitivi.signalinterface import Signallable
 from pitivi.encode import available_combinations, \
      get_compatible_sink_caps
-from pitivi.stream import get_stream_for_caps
 from pitivi.log.loggable import Loggable
 
 

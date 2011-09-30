@@ -21,7 +21,6 @@
 
 import gst
 from pitivi.factories.base import OperationFactory
-from pitivi.stream import AudioStream, VideoStream
 
 from gettext import gettext as _
 

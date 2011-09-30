@@ -35,15 +35,14 @@ from pitivi.ui.pathwalker import PathWalker, quote_uri
 from pitivi.ui.filelisterrordialog import FileListErrorDialog
 from pitivi.configure import get_pixmap_dir
 from pitivi.signalgroup import SignalGroup
-from pitivi.stream import VideoStream, AudioStream, TextStream, \
-        MultimediaStream
+
 from pitivi.settings import GlobalSettings
 from pitivi.utils import beautify_length
 from pitivi.ui.common import beautify_factory, factory_name, \
     beautify_stream, SPACING, PADDING
 from pitivi.log.loggable import Loggable
 from pitivi.sourcelist import SourceListError
-from pitivi.ui.filechooserpreview import PreviewWidget
+#from pitivi.ui.filechooserpreview import PreviewWidget
 
 SHOW_TREEVIEW = 1
 SHOW_ICONVIEW = 2
@@ -66,12 +65,9 @@ GlobalSettings.addConfigOption('lastClipView',
 
 (COL_ICON,
  COL_ICON_LARGE,
- COL_INFOTEXT,
- COL_FACTORY,
  COL_URI,
- COL_LENGTH,
  COL_SEARCH_TEXT,
- COL_SHORT_TEXT) = range(8)
+ COL_SHORT_TEXT) = range(5)
 
 (LOCAL_FILE,
  LOCAL_DIR,
@@ -123,7 +119,7 @@ class SourceList(gtk.VBox, Loggable):
         # Store
         # icon, infotext, objectfactory, uri, length
         self.storemodel = gtk.ListStore(gtk.gdk.Pixbuf, gtk.gdk.Pixbuf,
-            str, object, str, str, str, str)
+            str, str, str)
 
         # Scrolled Windows
         self.treeview_scrollwin = gtk.ScrolledWindow()
@@ -208,15 +204,6 @@ class SourceList(gtk.VBox, Loggable):
         txtcell = gtk.CellRendererText()
         txtcell.set_property("ellipsize", pango.ELLIPSIZE_END)
         namecol.pack_start(txtcell)
-        namecol.add_attribute(txtcell, "markup", COL_INFOTEXT)
-
-        namecol = gtk.TreeViewColumn(_("Duration"))
-        namecol.set_expand(False)
-        self.treeview.append_column(namecol)
-        txtcell = gtk.CellRendererText()
-        txtcell.set_property("yalign", 0.0)
-        namecol.pack_start(txtcell)
-        namecol.add_attribute(txtcell, "markup", COL_LENGTH)
 
         # IconView
         self.iconview = gtk.IconView(self.modelFilter)
@@ -225,7 +212,6 @@ class SourceList(gtk.VBox, Loggable):
         self.iconview.connect("selection-changed", self._viewSelectionChangedCb)
         self.iconview.set_orientation(gtk.ORIENTATION_VERTICAL)
         self.iconview.set_property("has_tooltip", True)
-        self.iconview.set_tooltip_column(COL_INFOTEXT)
         self.iconview.set_text_column(COL_SHORT_TEXT)
         self.iconview.set_pixbuf_column(COL_ICON_LARGE)
         self.iconview.set_selection_mode(gtk.SELECTION_MULTIPLE)
@@ -525,10 +511,10 @@ class SourceList(gtk.VBox, Loggable):
         self._importDialog.set_default_response(gtk.RESPONSE_OK)
         self._importDialog.set_select_multiple(True)
         self._importDialog.set_modal(False)
-        pw = PreviewWidget(self.app)
-        self._importDialog.set_preview_widget(pw)
+        #pw = PreviewWidget(self.app)
+        #self._importDialog.set_preview_widget(pw)
         self._importDialog.set_use_preview_label(False)
-        self._importDialog.connect('update-preview', pw.add_preview_request)
+        #self._importDialog.connect('update-preview', pw.add_preview_request)
         self._importDialog.set_current_folder(self.app.settings.lastImportFolder)
 
         self._importDialog.connect('response', self._dialogBoxResponseCb, select_folders)
@@ -554,65 +540,33 @@ class SourceList(gtk.VBox, Loggable):
         elif total_clips != 0:
             self._progressbar.set_fraction((current_clip_iter - 1) / float(total_clips))
 
-    def _addFactory(self, factory):
-        video = factory.getOutputStreams(VideoStream)
-        if video and video[0].thumbnail:
-            thumbnail_file = video[0].thumbnail
-            try:
-                self.debug("attempting to open thumbnail file '%s'",
-                        thumbnail_file)
-                pixbuf = gtk.gdk.pixbuf_new_from_file(thumbnail_file)
-            except:
-                self.error("Failure to create thumbnail from file '%s'",
-                        thumbnail_file)
-                thumbnail = self.videofilepixbuf
-                thumbnail_large = self.videofilepixbuf
-            else:
-                desiredheight = int(64 / float(video[0].dar))
-                thumbnail = pixbuf.scale_simple(64,
-                        desiredheight, gtk.gdk.INTERP_BILINEAR)
-                desiredheight = int(96 / float(video[0].dar))
-                thumbnail_large = pixbuf.scale_simple(96,
-                        desiredheight, gtk.gdk.INTERP_BILINEAR)
-        else:
-            if video:
-                thumbnail = self.videofilepixbuf
-                thumbnail_large = self.videofilepixbuf
-            else:
-                thumbnail = self.audiofilepixbuf
-                thumbnail_large = self.audiofilepixbuf
-
-        if not factory.duration or factory.duration == gst.CLOCK_TIME_NONE:
-            duration = ''
-        else:
-            duration = beautify_length(factory.duration)
+    def _addFactory(self, uri):
+        thumbnail = self.audiofilepixbuf
+        thumbnail_large = self.audiofilepixbuf
 
         short_text = None
-        uni = unicode(factory_name(factory), 'utf-8')
+        uni = unicode(uri.split("file://")[1], 'utf-8')
 
         if len(uni) > 34:
             short_uni = uni[0:29]
             short_uni += unicode('...')
             short_text = short_uni.encode('utf-8')
         else:
-            short_text = factory_name(factory)
+            short_text = uni
 
         self.storemodel.append([thumbnail,
             thumbnail_large,
-            beautify_factory(factory),
-            factory,
-            factory.uri,
-            duration,
-            factory_name(factory),
+            uri,
+            uni,
             short_text])
         self._displayClipView()
 
     # sourcelist callbacks
 
-    def _sourceAddedCb(self, sourcelist, factory):
+    def _sourceAddedCb(self, sourcelist, uri):
         """ a file was added to the sourcelist """
         self._updateProgressbar()
-        self._addFactory(factory)
+        self._addFactory(uri)
         if len(self.storemodel):
             self.infobar.hide_all()
             self.search_hbox.show_all()

@@ -52,7 +52,6 @@ from pitivi.undo import UndoableActionLog, DebugActionLogObserver
 from pitivi.timeline.timeline_undo import TimelineLogObserver
 from pitivi.sourcelist_undo import SourceListLogObserver
 from pitivi.ui.viewer import PitiviViewer
-from pitivi.actioner import Renderer, Previewer
 from pitivi.ui.startupwizard import StartUpWizard
 
 # FIXME : Speedup loading time
@@ -324,12 +323,11 @@ class ProjectCreatorGuiPitivi(FullGuiPitivi):
                 self._discoveryErrorCb, uris)
         self.current.sources.addUris(uris)
 
-    def _sourceAddedCb(self, sourcelist, factory,
+    def _sourceAddedCb(self, sourcelist, uri,
             startup_uris, add_to_timeline):
-        if self._maybePopStartupUri(startup_uris, factory.uri) \
+        if self._maybePopStartupUri(startup_uris, uri) \
                 and add_to_timeline:
             self.action_log.begin("add clip")
-            self.current.timeline.addSourceFactory(factory)
             self.action_log.commit()
 
     def _discoveryErrorCb(self, sourcelist, uri, error, debug, startup_uris):

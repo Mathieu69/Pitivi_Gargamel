@@ -11,7 +11,6 @@ from pitivi.receiver import receiver, handler
 from view import View
 import controller
 from zoominterface import Zoomable
-from pitivi.timeline.track import TrackError
 from pitivi.timeline.timeline import SELECT, SELECT_ADD, UNSELECT, \
     SELECT_BETWEEN, MoveContext, TrimStartContext, TrimEndContext
 from preview import Preview
@@ -22,7 +21,6 @@ from common import LAYER_SPACING, unpack_cairo_pattern, unpack_cairo_gradient
 from pitivi.ui.point import Point
 from pitivi.ui.prefs import PreferencesDialog
 from pitivi.settings import GlobalSettings
-from pitivi.stream import AudioStream, VideoStream
 
 LEFT_SIDE = gtk.gdk.Cursor(gtk.gdk.LEFT_SIDE)
 RIGHT_SIDE = gtk.gdk.Cursor(gtk.gdk.RIGHT_SIDE)
@@ -240,7 +238,7 @@ class TrackObject(View, goocanvas.Group, Zoomable):
                 self._view.app.current.seeker.seek(Zoomable.pixelToNs(x))
                 timeline.setSelectionToObj(element, SELECT)
 
-    def __init__(self, instance, element, track, timeline, is_transition = False):
+    def __init__(self, instance, element, track, timeline, is_transition=False):
         goocanvas.Group.__init__(self)
         View.__init__(self)
         Zoomable.__init__(self)
@@ -281,7 +279,7 @@ class TrackObject(View, goocanvas.Group, Zoomable):
             for thing in (self.bg, self.selection_indicator,
                 self.start_handle, self.end_handle, self.namebg, self.name):
                 self.add_child(thing)
-        else :
+        else:
             for thing in (self.bg, self.selection_indicator,
                 self.namebg, self.name):
                 self.add_child(thing)
@@ -379,7 +377,7 @@ class TrackObject(View, goocanvas.Group, Zoomable):
 
     def _setElement(self):
         if self.element and not self.is_transition:
-            self.name.props.text = self.element.get_property ("uri")
+            self.name.props.text = self.element.get_property("uri")
             twidth, theight = text_size(self.name)
             self.namewidth = twidth
             self.nameheight = theight
@@ -400,7 +398,6 @@ class TrackObject(View, goocanvas.Group, Zoomable):
                 self.timeline.selected.append(elem)
             for elem in element:
                 if elem == self.element:
-                    print elem.get_timeline_object().get_property("priority"), "la pute !!"
                     self.selection_indicator.props.visibility = goocanvas.ITEM_VISIBLE
                     elem.selected = True
                 elif self.element.selected == False:
@@ -426,7 +423,7 @@ class TrackObject(View, goocanvas.Group, Zoomable):
             print self.element.get_start()
             raise Exception(e)
         priority = (self.element.get_priority()) / 10
-        if priority < 0 :
+        if priority < 0:
             priority = 0
         y = (self.height + LAYER_SPACING) * priority
         self.set_simple_transform(x, y, 1, 0)

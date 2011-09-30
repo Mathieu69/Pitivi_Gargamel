@@ -1,8 +1,6 @@
 # -*- coding: utf-8 -*-
 from pitivi.settings import GlobalSettings
 import cairo
-from pitivi.stream import VideoStream, AudioStream, TextStream, \
-        MultimediaStream
 from xml.sax.saxutils import escape
 from urllib import unquote
 from gettext import gettext as _
